@@ -140,7 +140,6 @@ def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_
 
 	model.train()
 	count = 0
-	count_batch = 0
 	running_loss = 0
 
 	progressbar = tqdm(range(len(data_loader)))
@@ -148,10 +147,9 @@ def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_
 	for i, (image, target) in enumerate(data_loader):
 		
 		# optimizer.zero_grad()
-		if count_batch == 0:
+		if (count + 1) % batch_multiplier == 0:
 			optimizer.step()
 			optimizer.zero_grad()
-			count_batch = batch_multiplier
 
 		if branch_name == 'local':
 			with torch.no_grad():
@@ -184,7 +182,6 @@ def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_
 
 		running_loss += loss.data.item() * batch_multiplier
 		count += 1
-		count_batch -= 1
 
 		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch, exp_cfg['NUM_EPOCH'] - 1, loss.data.item() * batch_multiplier))
 		progressbar.update(1)
@@ -257,8 +254,6 @@ def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model
 			shutil.copyfile(save_name, copy_name)
 			print(" Best model is saved: {}\n".format(copy_name))
 
-	return epoch_val_loss
-
 def main():
 	global GlobalModel, LocalModel, FusionModel
 
@@ -270,7 +265,7 @@ def main():
 		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = True, num_workers = 4)
 
 		val_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = VAL_IMAGE_LIST, transform = transform)
-		val_loader = DataLoader(dataset = val_dataset, batch_size = exp_cfg['batch_size'][branch_name], shuffle = False, num_workers = 4)
+		val_loader = DataLoader(dataset = val_dataset, batch_size = exp_cfg['batch_size'][branch_name]//2, shuffle = False, num_workers = 4)
 
 		if args.resume:
 			save_dict = torch.load(os.path.join(exp_dir, exp_dir.split('/')[-1] + '_'+ branch_name + '.pth'))
