@@ -48,19 +48,19 @@ transform = transforms.Compose([
    normalize,
 ])
 
-DATASET_PATH = path.join('..', 'lung-disease-detection', 'data')
+DATASET_PATH = path.join('D://', 'Data', 'data')
 IMAGES_DATA_PATH = path.join(DATASET_PATH, 'images')
-TRAIN_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'train_list.txt')
-VAL_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'val_list.txt')
+TRAIN_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'dummy_data_train_list.txt')
+VAL_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'dummy_data_val_list.txt')
 
-MAX_BATCH_CAPACITY = 16
+MAX_BATCH_CAPACITY = 2
 # batch_multiplier = exp_cfg['batch_size']['global'] // MAX_BATCH_CAPACITY
 
-# train_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = TRAIN_IMAGE_LIST, transform = transform)
-# train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = True, num_workers = 4)
+train_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = TRAIN_IMAGE_LIST, transform = transform)
+train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = True, num_workers = 4)
 
-# val_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = VAL_IMAGE_LIST, transform = transform)
-# val_loader = DataLoader(dataset = val_dataset, batch_size = exp_cfg['batch_size']['global'], shuffle = False, num_workers = 4)
+val_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = VAL_IMAGE_LIST, transform = transform)
+val_loader = DataLoader(dataset = val_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = False, num_workers = 4)
 
 BRANCH_NAME_LIST = ['global', 'local', 'fusion']
 BEST_VAL_LOSS = {
@@ -140,18 +140,18 @@ def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_
 
 	model.train()
 	count = 0
-	count_batch = 0
+	# count_batch = 0
 	running_loss = 0
 
 	progressbar = tqdm(range(len(data_loader)))
 
 	for i, (image, target) in enumerate(data_loader):
 		
-		# optimizer.zero_grad()
-		if count_batch == 0:
-			optimizer.step()
-			optimizer.zero_grad()
-			count_batch = batch_multiplier
+		optimizer.zero_grad()
+		# if count_batch == 0:
+		# 	optimizer.step()
+		# 	optimizer.zero_grad()
+		# 	count_batch = batch_multiplier
 
 		if branch_name == 'local':
 			with torch.no_grad():
@@ -180,11 +180,11 @@ def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_
 		loss = loss_func(output, target) / batch_multiplier
 
 		loss.backward()
-		# optimizer.step()
+		optimizer.step()
 
 		running_loss += loss.data.item() * batch_multiplier
 		count += 1
-		count_batch -= 1
+		# count_batch -= 1
 
 		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch, exp_cfg['NUM_EPOCH'] - 1, loss.data.item() * batch_multiplier))
 		progressbar.update(1)
