@@ -18,23 +18,30 @@ from model import DenseNet121, Fusion_Branch
 from PIL import Image
 from tqdm import tqdm
 
-#np.set_printoptions(threshold = np.nan)
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--use', type=str, default='train', help='use for what (train or test)')
+    parser.add_argument("--exp_dir", type=str, default="./experiments/exp0")
+    args = parser.parse_args()
+    return args
+
+args = parse_args()
+
+# ------------ config ------------
+exp_dir = args.exp_dir
+exp_name = exp_dir.split('/')[-1]
+
+with open(os.path.join(exp_dir, "cfg.json")) as f:
+    exp_cfg = json.load(f)
 
 
-CKPT_PATH = ''
-
-CKPT_PATH_G = os.path.join('best_model', 'AG_CNN_Global_epoch_1.pkl') 
-CKPT_PATH_L = os.path.join('best_model', 'AG_CNN_Local_epoch_2.pkl')
-CKPT_PATH_F = os.path.join('best_model', 'AG_CNN_Fusion_epoch_23.pkl')
-
-N_CLASSES = 14
 CLASS_NAMES = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass', 'Nodule', 'Pneumonia',
                 'Pneumothorax', 'Consolidation', 'Edema', 'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia']
 
 # load with your own dataset path
 DATA_DIR = os.path.join('D://', 'Data', 'data', 'images')
-TRAIN_IMAGE_LIST = os.path.join('labels', 'train_list.txt')
-VAL_IMAGE_LIST = os.path.join('labels', 'val_list.txt')
+TRAIN_IMAGE_LIST = os.path.join('D://', 'Data', 'data', 'labels', 'train_list.txt')
+VAL_IMAGE_LIST = os.path.join('D://', 'Data', 'data', 'labels', 'val_list.txt')
 save_model_path = 'model-AG-CNN'
 save_model_name = 'AG_CNN'
 
