@@ -48,19 +48,19 @@ transform = transforms.Compose([
    normalize,
 ])
 
-DATASET_PATH = path.join('D://', 'Data', 'data')
+DATASET_PATH = path.join('..', 'lung-disease-detection', 'data')
 IMAGES_DATA_PATH = path.join(DATASET_PATH, 'images')
-TRAIN_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'dummy_data_train_list.txt')
-VAL_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'dummy_data_val_list.txt')
+TRAIN_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'train_list.txt')
+VAL_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'val_list.txt')
 
-MAX_BATCH_CAPACITY = 4
-batch_multiplier = int(exp_cfg['batch_size']['global'] / MAX_BATCH_CAPACITY)
+MAX_BATCH_CAPACITY = 16
+# batch_multiplier = exp_cfg['batch_size']['global'] // MAX_BATCH_CAPACITY
 
-train_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = TRAIN_IMAGE_LIST, transform = transform)
-train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = True, num_workers = 4)
+# train_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = TRAIN_IMAGE_LIST, transform = transform)
+# train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = True, num_workers = 4)
 
-val_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = VAL_IMAGE_LIST, transform = transform)
-val_loader = DataLoader(dataset = val_dataset, batch_size = exp_cfg['batch_size']['global'], shuffle = False, num_workers = 4)
+# val_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = VAL_IMAGE_LIST, transform = transform)
+# val_loader = DataLoader(dataset = val_dataset, batch_size = exp_cfg['batch_size']['global'], shuffle = False, num_workers = 4)
 
 BRANCH_NAME_LIST = ['global', 'local', 'fusion']
 BEST_VAL_LOSS = {
@@ -134,7 +134,7 @@ def save_model(epoch, val_loss, model, optimizer, lr_scheduler, branch_name = 'g
 	torch.save(save_dict, save_name)
 	print(" Model is saved: {}".format(save_name))
 
-def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_func, test_model):
+def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_func, test_model, batch_multiplier):
 
 	print(" Training {} model using lr = {}".format(branch_name, lr_scheduler.get_last_lr()))
 
@@ -177,16 +177,16 @@ def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_
 		target = target.cuda()
 
 		output, heatmap, pool = model(image)
-		loss = loss_func(output, target)
+		loss = loss_func(output, target) / batch_multiplier
 
 		loss.backward()
 		# optimizer.step()
 
-		running_loss += loss.data.item()
+		running_loss += loss.data.item() * batch_multiplier
 		count += 1
 		count_batch -= 1
 
-		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch, exp_cfg['NUM_EPOCH'] - 1, loss.data.item()))
+		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch, exp_cfg['NUM_EPOCH'] - 1, loss.data.item() * batch_multiplier))
 		progressbar.update(1)
 	progressbar.close()
 
@@ -262,7 +262,16 @@ def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model
 def main():
 	global GlobalModel, LocalModel, FusionModel
 
-	for branch_name in BRANCH_NAME_LIST:	
+	for branch_name in BRANCH_NAME_LIST:
+
+		batch_multiplier = exp_cfg['batch_size'][branch_name] // MAX_BATCH_CAPACITY
+
+		train_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = TRAIN_IMAGE_LIST, transform = transform)
+		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = True, num_workers = 4)
+
+		val_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = VAL_IMAGE_LIST, transform = transform)
+		val_loader = DataLoader(dataset = val_dataset, batch_size = exp_cfg['batch_size'][branch_name], shuffle = False, num_workers = 4)
+
 		if args.resume:
 			save_dict = torch.load(os.path.join(exp_dir, exp_dir.split('/')[-1] + '_'+ branch_name + '.pth'))
 
@@ -293,7 +302,7 @@ def main():
 
 			if branch_name == 'global':
 				GlobalModel = GlobalModel.to(device)
-				train(epoch, branch_name, GlobalModel, train_loader, optimizer_global, lr_scheduler_global, loss_global, None)
+				train(epoch, branch_name, GlobalModel, train_loader, optimizer_global, lr_scheduler_global, loss_global, None, batch_multiplier)
 				val(epoch, branch_name, GlobalModel, val_loader, optimizer_global, loss_global, None)
 
 			if branch_name == 'local':
@@ -304,7 +313,7 @@ def main():
 				GlobalModelTest.load_state_dict(save_dict_global['net'])
 
 				LocalModel = LocalModel.to(device)
-				train(epoch, branch_name, LocalModel, train_loader, optimizer_local, lr_scheduler_local, loss_local, GlobalModelTest)
+				train(epoch, branch_name, LocalModel, train_loader, optimizer_local, lr_scheduler_local, loss_local, GlobalModelTest, batch_multiplier)
 				val(epoch, branch_name, LocalModel, val_loader, optimizer_local, loss_local, GlobalModelTest)
 			
 			if branch_name == 'fusion':
@@ -319,7 +328,7 @@ def main():
 				LocalModelTest.load_state_dict(save_dict_local['net'])
 
 				FusionModel = FusionModel.to(device)
-				train(epoch, branch_name, FusionModel, train_loader, optimizer_fusion, lr_scheduler_fusion, loss_fusion, (GlobalModelTest, LocalModelTest))
+				train(epoch, branch_name, FusionModel, train_loader, optimizer_fusion, lr_scheduler_fusion, loss_fusion, (GlobalModelTest, LocalModelTest), batch_multiplier)
 				val(epoch, branch_name, FusionModel, val_loader, optimizer_fusion, loss_fusion, (GlobalModelTest, LocalModelTest))
 
 if __name__ == "__main__":
