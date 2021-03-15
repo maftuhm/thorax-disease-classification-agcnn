@@ -270,7 +270,7 @@ def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model
 		AUROCs = compute_AUCs(gt, pred)
 		AUROC_avg = np.array(AUROCs).mean()
 		print('Global branch: The average AUROC is {AUROC_avg:.3f}'.format(AUROC_avg=AUROC_avg))
-		for i in range(14):
+		for i in range(len(CLASS_NAMES)):
 			print('The AUROC of {} is {}'.format(CLASS_NAMES[i], AUROCs[i]))
 
 def main():
