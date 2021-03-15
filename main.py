@@ -155,6 +155,18 @@ def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_
 			del output, heatmap, pool
 			torch.cuda.empty_cache()
 
+		if branch_name == 'fusion':
+			with torch.no_grad():
+				output, heatmap, pool1 = test_model[0](image.cuda())
+				inputs = heatmap_crop_origin(heatmap.cpu(), image)
+				output, heatmap, pool2 = test_model[1](inputs.cuda())
+				pool1 = pool1.view(pool1.size(0), -1)
+				pool2 = pool2.view(pool2.size(0), -1)
+				image = torch.cat((pool1.cpu(), pool2.cpu()), dim=1)
+
+			del output, heatmap, pool1, pool2, inputs
+			torch.cuda.empty_cache()
+
 		image = image.cuda()
 		target = target.cuda()
 
@@ -179,6 +191,11 @@ def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_
 	save_model(epoch, epoch_train_loss, model, optimizer, lr_scheduler, branch_name)
 	print()
 
+	del image, target, loss, epoch_train_loss, output, heatmap, pool, model
+	torch.cuda.empty_cache()
+
+
+
 def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model):
 
 	print(" Validating {} model".format(branch_name, epoch,))
@@ -192,6 +209,22 @@ def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model
 
 	with torch.no_grad():
 		for i, (image, target) in enumerate(data_loader):
+
+			if branch_name == 'local':
+				output, heatmap, pool = test_model(image.cuda())
+				image = heatmap_crop_origin(heatmap.cpu(), image, exp_cfg['threshold'])
+
+				del output, heatmap, pool
+
+			if branch_name == 'fusion':
+				output, heatmap, pool1 = test_model[0](image.cuda())
+				inputs = heatmap_crop_origin(heatmap.cpu(), image)
+				output, heatmap, pool2 = test_model[1](inputs.cuda())
+				pool1 = pool1.view(pool1.size(0), -1)
+				pool2 = pool2.view(pool2.size(0), -1)
+				image = torch.cat((pool1.cpu(), pool2.cpu()), dim=1)
+
+				del output, heatmap, pool1, pool2, inputs
 
 			image = image.cuda()
 			target = target.cuda()
@@ -258,9 +291,6 @@ def main():
 
 			if branch_name == 'local':
 
-				del GlobalModel
-				torch.cuda.empty_cache()
-
 				save_dict_global = torch.load(os.path.join(exp_dir, exp_dir.split('/')[-1] + '_global_best' + '.pth'))
 	
 				GlobalModelTest = Net(exp_cfg['backbone']).to(device)
@@ -269,8 +299,21 @@ def main():
 				LocalModel = LocalModel.to(device)
 				train(epoch, branch_name, LocalModel, train_loader, optimizer_local, lr_scheduler_local, loss_local, GlobalModelTest)
 				val(epoch, branch_name, LocalModel, val_loader, optimizer_local, loss_local, GlobalModelTest)
+			
+			if branch_name == 'fusion':
 
+				save_dict_global = torch.load(os.path.join(exp_dir, exp_dir.split('/')[-1] + '_global_best' + '.pth'))
+				save_dict_local = torch.load(os.path.join(exp_dir, exp_dir.split('/')[-1] + '_local_best' + '.pth'))
 
+				GlobalModelTest = Net(exp_cfg['backbone']).to(device)
+				LocalModelTest = Net(exp_cfg['backbone']).to(device)
+
+				GlobalModelTest.load_state_dict(save_dict_global['net'])
+				LocalModelTest.load_state_dict(save_dict_local['net'])
+
+				FusionModel = FusionModel.to(device)
+				train(epoch, branch_name, FusionModel, train_loader, optimizer_fusion, lr_scheduler_fusion, loss_fusion, (GlobalModelTest, LocalModelTest))
+				val(epoch, branch_name, FusionModel, val_loader, optimizer_fusion, loss_fusion, (GlobalModelTest, LocalModelTest))
 
 if __name__ == "__main__":
 	main()

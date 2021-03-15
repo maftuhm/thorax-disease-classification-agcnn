@@ -44,8 +44,7 @@ class FusionNet(nn.Module):
         
         self.sigmoid = nn.Sigmoid()
     
-    def forward(self, global_pool, local_pool):
-        x = torch.cat((global_pool, local_pool), dim = 1)
+    def forward(self, x):
         x = self.fc(x)
         x = self.sigmoid(x)
-        return x
+        return x, x, x
