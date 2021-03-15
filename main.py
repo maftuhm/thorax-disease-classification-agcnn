@@ -6,6 +6,7 @@ from tqdm import tqdm
 import shutil
 import numpy as np
 from PIL import Image
+from utils import compute_AUCs 
 
 import torch
 import torch.nn as nn
@@ -48,12 +49,15 @@ transform = transforms.Compose([
    normalize,
 ])
 
+CLASS_NAMES = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass', 'Nodule', 'Pneumonia',
+				'Pneumothorax', 'Consolidation', 'Edema', 'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia']
+
 DATASET_PATH = path.join('D://', 'Data', 'data')
 IMAGES_DATA_PATH = path.join(DATASET_PATH, 'images')
 TRAIN_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'dummy_data_train_list.txt')
 VAL_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'dummy_data_val_list.txt')
 
-MAX_BATCH_CAPACITY = 2
+MAX_BATCH_CAPACITY = 4
 # batch_multiplier = exp_cfg['batch_size']['global'] // MAX_BATCH_CAPACITY
 
 train_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = TRAIN_IMAGE_LIST, transform = transform)
@@ -177,16 +181,16 @@ def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_
 		target = target.cuda()
 
 		output, heatmap, pool = model(image)
-		loss = loss_func(output, target) / batch_multiplier
+		loss = loss_func(output, target)
 
 		loss.backward()
 		optimizer.step()
 
-		running_loss += loss.data.item() * batch_multiplier
+		running_loss += loss.data.item()
 		count += 1
 		# count_batch -= 1
 
-		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch, exp_cfg['NUM_EPOCH'] - 1, loss.data.item() * batch_multiplier))
+		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch, exp_cfg['NUM_EPOCH'] - 1, loss.data.item()))
 		progressbar.update(1)
 	progressbar.close()
 
@@ -212,6 +216,9 @@ def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model
 	count = 0
 	running_loss = 0
 	
+	gt = torch.FloatTensor().cuda()
+	pred = torch.FloatTensor().cuda()
+
 	progressbar = tqdm(range(len(data_loader)))
 
 	with torch.no_grad():
@@ -235,10 +242,13 @@ def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model
 
 			image = image.cuda()
 			target = target.cuda()
+			gt = torch.cat((gt, target), 0)
 
 			output, heatmap, pool = model(image)
 
 			loss = loss_func(output, target)
+
+			pred = torch.cat((pred, output.data), 0)
 
 			running_loss += loss.data.item()
 			count += 1
@@ -246,7 +256,7 @@ def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model
 			progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch,  exp_cfg['NUM_EPOCH'] - 1, loss.data.item()))
 			progressbar.update(1)
 		progressbar.close()
-		
+
 		epoch_val_loss = float(running_loss) / float(count)
 		print(' Epoch over Loss: {:.5f}'.format(epoch_val_loss))
 
@@ -257,20 +267,24 @@ def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model
 			shutil.copyfile(save_name, copy_name)
 			print(" Best model is saved: {}\n".format(copy_name))
 
-	return epoch_val_loss
+		AUROCs = compute_AUCs(gt, pred)
+		AUROC_avg = np.array(AUROCs).mean()
+		print('Global branch: The average AUROC is {AUROC_avg:.3f}'.format(AUROC_avg=AUROC_avg))
+		for i in range(14):
+			print('The AUROC of {} is {}'.format(CLASS_NAMES[i], AUROCs[i]))
 
 def main():
 	global GlobalModel, LocalModel, FusionModel
 
 	for branch_name in BRANCH_NAME_LIST:
 
-		batch_multiplier = exp_cfg['batch_size'][branch_name] // MAX_BATCH_CAPACITY
+		# batch_multiplier = exp_cfg['batch_size'][branch_name] // MAX_BATCH_CAPACITY
 
-		train_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = TRAIN_IMAGE_LIST, transform = transform)
-		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = True, num_workers = 4)
+		# train_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = TRAIN_IMAGE_LIST, transform = transform)
+		# train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = True, num_workers = 4)
 
-		val_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = VAL_IMAGE_LIST, transform = transform)
-		val_loader = DataLoader(dataset = val_dataset, batch_size = exp_cfg['batch_size'][branch_name], shuffle = False, num_workers = 4)
+		# val_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = VAL_IMAGE_LIST, transform = transform)
+		# val_loader = DataLoader(dataset = val_dataset, batch_size = exp_cfg['batch_size'][branch_name], shuffle = False, num_workers = 4)
 
 		if args.resume:
 			save_dict = torch.load(os.path.join(exp_dir, exp_dir.split('/')[-1] + '_'+ branch_name + '.pth'))
@@ -302,7 +316,7 @@ def main():
 
 			if branch_name == 'global':
 				GlobalModel = GlobalModel.to(device)
-				train(epoch, branch_name, GlobalModel, train_loader, optimizer_global, lr_scheduler_global, loss_global, None, batch_multiplier)
+				train(epoch, branch_name, GlobalModel, train_loader, optimizer_global, lr_scheduler_global, loss_global, None, None)
 				val(epoch, branch_name, GlobalModel, val_loader, optimizer_global, loss_global, None)
 
 			if branch_name == 'local':
@@ -313,7 +327,7 @@ def main():
 				GlobalModelTest.load_state_dict(save_dict_global['net'])
 
 				LocalModel = LocalModel.to(device)
-				train(epoch, branch_name, LocalModel, train_loader, optimizer_local, lr_scheduler_local, loss_local, GlobalModelTest, batch_multiplier)
+				train(epoch, branch_name, LocalModel, train_loader, optimizer_local, lr_scheduler_local, loss_local, GlobalModelTest, None)
 				val(epoch, branch_name, LocalModel, val_loader, optimizer_local, loss_local, GlobalModelTest)
 			
 			if branch_name == 'fusion':
@@ -328,7 +342,7 @@ def main():
 				LocalModelTest.load_state_dict(save_dict_local['net'])
 
 				FusionModel = FusionModel.to(device)
-				train(epoch, branch_name, FusionModel, train_loader, optimizer_fusion, lr_scheduler_fusion, loss_fusion, (GlobalModelTest, LocalModelTest), batch_multiplier)
+				train(epoch, branch_name, FusionModel, train_loader, optimizer_fusion, lr_scheduler_fusion, loss_fusion, (GlobalModelTest, LocalModelTest), None)
 				val(epoch, branch_name, FusionModel, val_loader, optimizer_fusion, loss_fusion, (GlobalModelTest, LocalModelTest))
 
 if __name__ == "__main__":
