@@ -6,6 +6,7 @@ from tqdm import tqdm
 import shutil
 import numpy as np
 from PIL import Image
+from sklearn.metrics import roc_auc_score
 
 import torch
 import torch.nn as nn
@@ -47,6 +48,10 @@ transform = transforms.Compose([
    transforms.ToTensor(),
    normalize,
 ])
+
+
+CLASS_NAMES = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass', 'Nodule', 'Pneumonia',
+				'Pneumothorax', 'Consolidation', 'Edema', 'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia']
 
 DATASET_PATH = path.join('..', 'lung-disease-detection', 'data')
 IMAGES_DATA_PATH = path.join(DATASET_PATH, 'images')
@@ -134,6 +139,14 @@ def save_model(epoch, val_loss, model, optimizer, lr_scheduler, branch_name = 'g
 	torch.save(save_dict, save_name)
 	print(" Model is saved: {}".format(save_name))
 
+def compute_AUCs(gt, pred):
+	AUROCs = []
+	gt_np = gt.cpu().numpy()
+	pred_np = pred.cpu().numpy()
+	for i in range(len(CLASS_NAMES)):
+		AUROCs.append(roc_auc_score(gt_np[:, i], pred_np[:, i]))
+	return AUROCs
+
 def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_func, test_model, batch_multiplier):
 
 	print(" Training {} model using lr = {}".format(branch_name, lr_scheduler.get_last_lr()))
@@ -176,7 +189,6 @@ def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_
 
 		output, heatmap, pool = model(image)
 		loss = loss_func(output, target) / batch_multiplier
-
 		loss.backward()
 		# optimizer.step()
 
@@ -198,14 +210,15 @@ def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_
 	del image, target, loss, epoch_train_loss, output, heatmap, pool, model
 	torch.cuda.empty_cache()
 
-
-
 def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model):
 
 	print(" Validating {} model".format(branch_name, epoch,))
 
 	model.eval()
 	
+	gt = torch.FloatTensor().cuda()
+	pred = torch.FloatTensor().cuda()
+
 	count = 0
 	running_loss = 0
 	
@@ -232,8 +245,10 @@ def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model
 
 			image = image.cuda()
 			target = target.cuda()
+			gt = torch.cat((gt, target), 0)
 
 			output, heatmap, pool = model(image)
+			pred = torch.cat((pred, output.data), 0)
 
 			loss = loss_func(output, target)
 
@@ -253,6 +268,25 @@ def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model
 			copy_name = os.path.join(exp_dir, exp_dir.split('/')[-1] + '_' + branch_name + '_best.pth')
 			shutil.copyfile(save_name, copy_name)
 			print(" Best model is saved: {}\n".format(copy_name))
+
+		AUROCs = compute_AUCs(gt, pred)
+		print("|=======================================|")
+		print("|\t\t  AUROC\t\t\t|")
+		print("|=======================================|")
+		print("|\t      global branch\t\t|")
+		print("|---------------------------------------|")
+		for i in range(len(CLASS_NAMES)):
+			if len(CLASS_NAMES[i]) < 6:
+				print("| {}\t\t\t|".format(CLASS_NAMES[i]), end="")
+			elif len(CLASS_NAMES[i]) > 14:
+				print("| {}\t|".format(CLASS_NAMES[i]), end="")
+			else:
+				print("| {}\t\t|".format(CLASS_NAMES[i]), end="")
+			print("  {:.10f}\t|".format(AUROCs[i]))
+		print("|---------------------------------------|")
+		print("| Average\t\t|  {:.10f}\t|".format(np.array(AUROCs).mean()))
+		print("|=======================================|")
+		print()
 
 def main():
 	global GlobalModel, LocalModel, FusionModel
