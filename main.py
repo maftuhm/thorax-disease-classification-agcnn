@@ -54,12 +54,13 @@ TRAIN_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'dummy_data_train_list.txt'
 VAL_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'dummy_data_val_list.txt')
 
 MAX_BATCH_CAPACITY = 4
+batch_multiplier = int(exp_cfg['batch_size']['global'] / MAX_BATCH_CAPACITY)
 
 train_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = TRAIN_IMAGE_LIST, transform = transform)
 train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = True, num_workers = 4)
 
 val_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = VAL_IMAGE_LIST, transform = transform)
-val_loader = DataLoader(dataset = val_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = False, num_workers = 4)
+val_loader = DataLoader(dataset = val_dataset, batch_size = exp_cfg['batch_size']['global'], shuffle = False, num_workers = 4)
 
 BRANCH_NAME_LIST = ['global', 'local', 'fusion']
 BEST_VAL_LOSS = {
@@ -98,22 +99,22 @@ def heatmap_crop_origin(heatmap, origin_img, threshold = 0.7):
 		max1 = torch.max(heatmap_two)
 		min1 = torch.min(heatmap_two)
 
-		heatmap_two = (heatmap_two - min1) / (max1 - min1)
+		heatmap_two = (heatmap_two - min1) // (max1 - min1)
 		heatmap_two[heatmap_two > threshold] = 1
 		heatmap_two[heatmap_two != 1] = 0
 
 		where = torch.from_numpy(np.argwhere(heatmap_two.detach().numpy() == 1))
-		xmin = int((torch.min(where, dim =0)[0][0])*224/7)
-		xmax = int(torch.max(where, dim=0)[0][0]*224/7)
-		ymin = int(torch.min(where, dim =0)[0][1]*224/7)
-		ymax = int(torch.max(where, dim =0)[0][1]*224/7)
+		xmin = int((torch.min(where, dim =0)[0][0])*224//7)
+		xmax = int(torch.max(where, dim=0)[0][0]*224//7)
+		ymin = int(torch.min(where, dim =0)[0][1]*224//7)
+		ymax = int(torch.max(where, dim =0)[0][1]*224//7)
 
 		if xmin == xmax:
-			xmin = int((torch.min(where, dim =0)[0][0])*224/7)
-			xmax = int((torch.max(where, dim=0)[0][0] + 1)*224/7)
+			xmin = int((torch.min(where, dim =0)[0][0])*224//7)
+			xmax = int((torch.max(where, dim=0)[0][0] + 1)*224//7)
 		if ymin == ymax:
-			ymin = int((torch.min(where, dim =0)[0][1])*224/7)
-			ymax = int((torch.max(where, dim =0)[0][1] + 1)*224/7)
+			ymin = int((torch.min(where, dim =0)[0][1])*224//7)
+			ymax = int((torch.max(where, dim =0)[0][1] + 1)*224//7)
 
 		sliced = transforms.ToPILImage()(origin_img[batch][:, xmin:xmax, ymin:ymax])
 		img_one = sliced.resize((224, 224), Image.ANTIALIAS)
@@ -135,18 +136,23 @@ def save_model(epoch, val_loss, model, optimizer, lr_scheduler, branch_name = 'g
 
 def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_func, test_model):
 
-	print(" Training {} model with lr = {}".format(branch_name, lr_scheduler.get_last_lr()))
+	print(" Training {} model using lr = {}".format(branch_name, lr_scheduler.get_last_lr()))
 
 	model.train()
 	count = 0
+	count_batch = 0
 	running_loss = 0
 
 	progressbar = tqdm(range(len(data_loader)))
 
 	for i, (image, target) in enumerate(data_loader):
 		
-		optimizer.zero_grad()
-		
+		# optimizer.zero_grad()
+		if count_batch == 0:
+			optimizer.step()
+			optimizer.zero_grad()
+			count_batch = batch_multiplier
+
 		if branch_name == 'local':
 			with torch.no_grad():
 				output, heatmap, pool = test_model(image.cuda())
@@ -174,10 +180,11 @@ def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_
 		loss = loss_func(output, target)
 
 		loss.backward()
-		optimizer.step()
+		# optimizer.step()
 
 		running_loss += loss.data.item()
 		count += 1
+		count_batch -= 1
 
 		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch, exp_cfg['NUM_EPOCH'] - 1, loss.data.item()))
 		progressbar.update(1)
