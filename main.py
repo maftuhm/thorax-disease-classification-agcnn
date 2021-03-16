@@ -24,7 +24,7 @@ cudnn.benchmark = True
 
 def parse_args():
 	parser = argparse.ArgumentParser()
-	parser.add_argument("--exp_dir", type=str, default="./experiments/exp2")
+	parser.add_argument("--exp_dir", type=str, default="./experiments/exp3")
 	parser.add_argument("--resume", "-r", action="store_true")
 	args = parser.parse_args()
 	return args
@@ -60,7 +60,11 @@ IMAGES_DATA_PATH = path.join(DATASET_PATH, 'images')
 TRAIN_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'train_list.txt')
 VAL_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'val_list.txt')
 
-MAX_BATCH_CAPACITY = 16
+MAX_BATCH_CAPACITY = {
+	'global' : 16,
+	'local' : 8,
+	'fusion' : 8
+}
 # batch_multiplier = exp_cfg['batch_size']['global'] // MAX_BATCH_CAPACITY
 
 # train_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = TRAIN_IMAGE_LIST, transform = transform)
@@ -203,7 +207,7 @@ def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_
 		progressbar.update(1)
 
 		if count % batch_multiplier == 0:
-			writer.add_scalar('train loss', mini_batch_loss, epoch * len(data_loader) + i)
+			writer.add_scalar('train/' + branch_name + ' loss', mini_batch_loss, epoch * len(data_loader) + i)
 			mini_batch_loss = 0.
 
 	progressbar.close()
@@ -265,7 +269,7 @@ def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model
 
 			progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch,  exp_cfg['NUM_EPOCH'] - 1, loss.data.item()))
 			progressbar.update(1)
-			writer.add_scalar('val loss', loss.data.item(), epoch * len(data_loader) + i)
+			writer.add_scalar('val/' + branch_name + ' loss', loss.data.item(), epoch * len(data_loader) + i)
 
 		progressbar.close()
 		
@@ -277,7 +281,7 @@ def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model
 			save_name = path.join(exp_dir, exp_dir.split('/')[-1] + '_' + branch_name + '.pth')
 			copy_name = os.path.join(exp_dir, exp_dir.split('/')[-1] + '_' + branch_name + '_best.pth')
 			shutil.copyfile(save_name, copy_name)
-			print(" Best model is saved: {}\n".format(copy_name))
+			print(" Best model is saved: {}".format(copy_name))
 
 		AUROCs = compute_AUCs(gt, pred)
 		print("|=======================================|")
@@ -302,38 +306,53 @@ def main():
 	global GlobalModel, LocalModel, FusionModel
 
 	for branch_name in BRANCH_NAME_LIST:
-
-		batch_multiplier = exp_cfg['batch_size'][branch_name] // MAX_BATCH_CAPACITY
+		print(" Start training " + branch_name + " branch...")
+		batch_multiplier = exp_cfg['batch_size'][branch_name] // MAX_BATCH_CAPACITY[branch_name]
 
 		train_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = TRAIN_IMAGE_LIST, transform = transform)
-		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = True, num_workers = 4)
+		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 4)
 
 		val_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = VAL_IMAGE_LIST, transform = transform)
 		val_loader = DataLoader(dataset = val_dataset, batch_size = exp_cfg['batch_size'][branch_name]//2, shuffle = False, num_workers = 4)
 
 		if args.resume:
-			save_dict = torch.load(os.path.join(exp_dir, exp_dir.split('/')[-1] + '_'+ branch_name + '.pth'))
+
+			CKPT_PATH = path.join(exp_dir, exp_dir.split('/')[-1] + '_'+ branch_name + '.pth')
+			file_found = False
+
+			if path.isfile(CKPT_PATH):
+				save_dict = torch.load(CKPT_PATH)
+				file_found = True
 
 			if branch_name == 'global':
 				GlobalModel = GlobalModel.to(device)
-				GlobalModel.load_state_dict(save_dict['net'])
-				optimizer_global.load_state_dict(save_dict['optim'])
-				lr_scheduler_global.load_state_dict(save_dict['lr_scheduler'])
+
+				if file_found:
+					GlobalModel.load_state_dict(save_dict['net'])
+					optimizer_global.load_state_dict(save_dict['optim'])
+					lr_scheduler_global.load_state_dict(save_dict['lr_scheduler'])
 
 			if branch_name == 'local':
 				LocalModel = LocalModel.to(device)
-				LocalModel.load_state_dict(save_dict['net'])
-				optimizer_local.load_state_dict(save_dict['optim'])
-				lr_scheduler_local.load_state_dict(save_dict['lr_scheduler'])
+
+				if file_found:
+					LocalModel.load_state_dict(save_dict['net'])
+					optimizer_local.load_state_dict(save_dict['optim'])
+					lr_scheduler_local.load_state_dict(save_dict['lr_scheduler'])
 
 			if branch_name == 'fusion':
 				FusionModel = FusionModel.to(device)
-				FusionModel.load_state_dict(save_dict['net'])
-				optimizer_fusion.load_state_dict(save_dict['optim'])
-				lr_scheduler_fusion.load_state_dict(save_dict['lr_scheduler'])
 
-			BEST_VAL_LOSS[branch_name] = save_dict['loss_value']
-			start_epoch = save_dict['epoch'] + 1
+				if file_found:
+					FusionModel.load_state_dict(save_dict['net'])
+					optimizer_fusion.load_state_dict(save_dict['optim'])
+					lr_scheduler_fusion.load_state_dict(save_dict['lr_scheduler'])
+
+			if file_found:
+				BEST_VAL_LOSS[branch_name] = save_dict['loss_value']
+				start_epoch = save_dict['epoch'] + 1
+			else:
+				start_epoch = 0	
 		else:
 			start_epoch = 0
 
