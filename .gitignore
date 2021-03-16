@@ -1,3 +1,5 @@
 __pycache__/
 labels/
 *.pth
+log/
+log.txt

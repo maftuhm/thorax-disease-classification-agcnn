@@ -12,6 +12,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 import torch.backends.cudnn as cudnn
 
 import torchvision.transforms as transforms
@@ -23,7 +24,7 @@ cudnn.benchmark = True
 
 def parse_args():
 	parser = argparse.ArgumentParser()
-	parser.add_argument("--exp_dir", type=str, default="./experiments/exp0")
+	parser.add_argument("--exp_dir", type=str, default="./experiments/exp2")
 	parser.add_argument("--resume", "-r", action="store_true")
 	args = parser.parse_args()
 	return args
@@ -36,6 +37,7 @@ with open(path.join(exp_dir, "cfg.json")) as f:
 	exp_cfg = json.load(f)
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+writer = SummaryWriter(exp_dir + '/log')
 
 normalize = transforms.Normalize(
    mean=[0.485, 0.456, 0.406],
@@ -153,7 +155,8 @@ def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_
 
 	model.train()
 	count = 0
-	running_loss = 0
+	running_loss = 0.
+	mini_batch_loss = 0.
 
 	progressbar = tqdm(range(len(data_loader)))
 
@@ -193,10 +196,16 @@ def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_
 		# optimizer.step()
 
 		running_loss += loss.data.item() * batch_multiplier
+		mini_batch_loss += loss.data.item()
 		count += 1
 
 		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch, exp_cfg['NUM_EPOCH'] - 1, loss.data.item() * batch_multiplier))
 		progressbar.update(1)
+
+		if count % batch_multiplier == 0:
+			writer.add_scalar('train loss', mini_batch_loss, epoch * len(data_loader) + i)
+			mini_batch_loss = 0.
+
 	progressbar.close()
 
 	lr_scheduler.step()
@@ -220,8 +229,7 @@ def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model
 	pred = torch.FloatTensor().cuda()
 
 	count = 0
-	running_loss = 0
-	
+	running_loss = 0.
 	progressbar = tqdm(range(len(data_loader)))
 
 	with torch.no_grad():
@@ -257,6 +265,8 @@ def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model
 
 			progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch,  exp_cfg['NUM_EPOCH'] - 1, loss.data.item()))
 			progressbar.update(1)
+			writer.add_scalar('val loss', loss.data.item(), epoch * len(data_loader) + i)
+
 		progressbar.close()
 		
 		epoch_val_loss = float(running_loss) / float(count)
