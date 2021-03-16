@@ -12,6 +12,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 import torch.backends.cudnn as cudnn
 
 import torchvision.transforms as transforms
@@ -36,6 +37,7 @@ with open(path.join(exp_dir, "cfg.json")) as f:
 	exp_cfg = json.load(f)
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+writer = SummaryWriter(exp_dir + '/log')
 
 normalize = transforms.Normalize(
    mean=[0.485, 0.456, 0.406],
@@ -192,6 +194,10 @@ def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_
 
 		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch, exp_cfg['NUM_EPOCH'] - 1, loss.data.item()))
 		progressbar.update(1)
+
+		if i % 4 == 3:
+			writer.add_scalar('training loss', running_loss / 4, epoch * len(data_loader) + i)
+
 	progressbar.close()
 
 	lr_scheduler.step()
@@ -255,6 +261,10 @@ def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model
 
 			progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch,  exp_cfg['NUM_EPOCH'] - 1, loss.data.item()))
 			progressbar.update(1)
+
+			if i % 4 == 3:
+				writer.add_scalar('training loss', running_loss / 4, epoch * len(data_loader) + i)
+
 		progressbar.close()
 
 		epoch_val_loss = float(running_loss) / float(count)
