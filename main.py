@@ -7,6 +7,7 @@ import shutil
 import numpy as np
 from PIL import Image
 from sklearn.metrics import roc_auc_score
+from skimage.measure import label
 
 import torch
 import torch.nn as nn
@@ -24,7 +25,7 @@ cudnn.benchmark = True
 
 def parse_args():
 	parser = argparse.ArgumentParser()
-	parser.add_argument("--exp_dir", type=str, default="./experiments/exp3")
+	parser.add_argument("--exp_dir", type=str, default="./experiments/exp4")
 	parser.add_argument("--resume", "-r", action="store_true")
 	args = parser.parse_args()
 	return args
@@ -110,28 +111,44 @@ def heatmap_crop_origin(heatmap, origin_img, threshold = 0.7):
 		max1 = torch.max(heatmap_two)
 		min1 = torch.min(heatmap_two)
 
-		heatmap_two = (heatmap_two - min1) // (max1 - min1)
+		heatmap_two = (heatmap_two - min1) / (max1 - min1)
 		heatmap_two[heatmap_two > threshold] = 1
 		heatmap_two[heatmap_two != 1] = 0
 
-		where = torch.from_numpy(np.argwhere(heatmap_two.detach().numpy() == 1))
-		xmin = int((torch.min(where, dim =0)[0][0])*224//7)
-		xmax = int(torch.max(where, dim=0)[0][0]*224//7)
-		ymin = int(torch.min(where, dim =0)[0][1]*224//7)
-		ymax = int(torch.max(where, dim =0)[0][1]*224//7)
+		heatmap_maxconn = select_max_connect(heatmap_two.detach().numpy())
+
+		where = torch.from_numpy(np.argwhere(heatmap_maxconn == 1))
+		xmin = int((torch.min(where, dim =0)[0][0]) * 224 // 7)
+		xmax = int(torch.max(where, dim=0)[0][0] * 224 // 7)
+		ymin = int(torch.min(where, dim =0)[0][1] * 224 // 7)
+		ymax = int(torch.max(where, dim =0)[0][1] * 224 // 7)
 
 		if xmin == xmax:
-			xmin = int((torch.min(where, dim =0)[0][0])*224//7)
-			xmax = int((torch.max(where, dim=0)[0][0] + 1)*224//7)
+			xmin = int((torch.min(where, dim =0)[0][0]) * 224 // 7)
+			xmax = int((torch.max(where, dim=0)[0][0] + 1) * 224 // 7)
 		if ymin == ymax:
-			ymin = int((torch.min(where, dim =0)[0][1])*224//7)
-			ymax = int((torch.max(where, dim =0)[0][1] + 1)*224//7)
+			ymin = int((torch.min(where, dim =0)[0][1]) * 224 // 7)
+			ymax = int((torch.max(where, dim =0)[0][1] + 1) * 224 // 7)
 
 		sliced = transforms.ToPILImage()(origin_img[batch][:, xmin:xmax, ymin:ymax])
 		img_one = sliced.resize((224, 224), Image.ANTIALIAS)
 		img[batch] = transforms.ToTensor()(img_one)
 
 	return img
+
+def select_max_connect(heatmap):
+	labeled_img, num = label(heatmap, connectivity=2, background=0, return_num=True)    
+	max_label = 0
+	max_num = 0
+	for i in range(1, num+1):
+		if np.sum(labeled_img == i) > max_num:
+			max_num = np.sum(labeled_img == i)
+			max_label = i
+	lcc = (labeled_img == max_label)
+	if max_num == 0:
+	   lcc = (labeled_img == -1)
+	lcc = lcc + 0
+	return lcc
 
 def save_model(epoch, val_loss, model, optimizer, lr_scheduler, branch_name = 'global'):
 	save_dict = {
@@ -388,6 +405,8 @@ def main():
 				FusionModel = FusionModel.to(device)
 				train(epoch, branch_name, FusionModel, train_loader, optimizer_fusion, lr_scheduler_fusion, loss_fusion, (GlobalModelTest, LocalModelTest), batch_multiplier)
 				val(epoch, branch_name, FusionModel, val_loader, optimizer_fusion, loss_fusion, (GlobalModelTest, LocalModelTest))
+
+		print(" Training " + branch_name + " branch done.")
 
 if __name__ == "__main__":
 	main()
