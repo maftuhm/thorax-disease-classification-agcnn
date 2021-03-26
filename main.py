@@ -1,4 +1,5 @@
 import os
+import cv2
 import os.path as path
 import json
 import argparse
@@ -25,7 +26,7 @@ cudnn.benchmark = True
 
 def parse_args():
 	parser = argparse.ArgumentParser()
-	parser.add_argument("--exp_dir", type=str, default="./experiments/exp4")
+	parser.add_argument("--exp_dir", type=str, default="./experiments/exp5")
 	parser.add_argument("--resume", "-r", action="store_true")
 	args = parser.parse_args()
 	return args
@@ -100,55 +101,68 @@ loss_global = nn.BCELoss()
 loss_local = nn.BCELoss()
 loss_fusion = nn.BCELoss()
 
-def heatmap_crop_origin(heatmap, origin_img, threshold = 0.7):
+def Attention_gen_patchs(ori_image, fm_cuda):
+    # feature map -> feature mask (using feature map to crop on the original image) -> crop -> patchs
+    feature_conv = fm_cuda.data.cpu().numpy()
+    size_upsample = (224, 224) 
+    bz, nc, h, w = feature_conv.shape
 
-	batchsize = heatmap.size(0)
-	img = torch.randn(batchsize, 3, 224, 224)
+    patchs_cuda = torch.FloatTensor().cuda()
 
-	for batch in range(batchsize):
-		heatmap_one = torch.abs(heatmap[batch])
-		heatmap_two = torch.max(heatmap_one, dim=0)[0].squeeze(0)
-		max1 = torch.max(heatmap_two)
-		min1 = torch.min(heatmap_two)
+    for i in range(0, bz):
+        feature = feature_conv[i]
+        cam = feature.reshape((nc, h*w))
+        cam = cam.sum(axis=0)
+        cam = cam.reshape(h,w)
+        cam = cam - np.min(cam)
+        cam_img = cam / np.max(cam)
+        cam_img = np.uint8(255 * cam_img)
 
-		heatmap_two = (heatmap_two - min1) / (max1 - min1)
-		heatmap_two[heatmap_two > threshold] = 1
-		heatmap_two[heatmap_two != 1] = 0
+        heatmap_bin = binImage(cv2.resize(cam_img, size_upsample))
+        heatmap_maxconn = selectMaxConnect(heatmap_bin)
+        heatmap_mask = heatmap_bin * heatmap_maxconn
 
-		heatmap_maxconn = select_max_connect(heatmap_two.detach().numpy())
+        ind = np.argwhere(heatmap_mask != 0)
+        minh = min(ind[:,0])
+        minw = min(ind[:,1])
+        maxh = max(ind[:,0])
+        maxw = max(ind[:,1])
+        
+        # to ori image 
+        image = ori_image[i].numpy().reshape(224,224,3)
+        image = image[int(224*0.334):int(224*0.667),int(224*0.334):int(224*0.667),:]
 
-		where = torch.from_numpy(np.argwhere(heatmap_maxconn == 1))
-		xmin = int((torch.min(where, dim =0)[0][0]) * 224 // 7)
-		xmax = int(torch.max(where, dim=0)[0][0] * 224 // 7)
-		ymin = int(torch.min(where, dim =0)[0][1] * 224 // 7)
-		ymax = int(torch.max(where, dim =0)[0][1] * 224 // 7)
+        image = cv2.resize(image, size_upsample)
+        image_crop = image[minh:maxh,minw:maxw,:] * 256 # because image was normalized before
+        image_crop = transform(Image.fromarray(image_crop.astype('uint8')).convert('RGB')) 
 
-		if xmin == xmax:
-			xmin = int((torch.min(where, dim =0)[0][0]) * 224 // 7)
-			xmax = int((torch.max(where, dim=0)[0][0] + 1) * 224 // 7)
-		if ymin == ymax:
-			ymin = int((torch.min(where, dim =0)[0][1]) * 224 // 7)
-			ymax = int((torch.max(where, dim =0)[0][1] + 1) * 224 // 7)
+        img_variable = torch.autograd.Variable(image_crop.reshape(3,224,224).unsqueeze(0).cuda())
 
-		sliced = transforms.ToPILImage()(origin_img[batch][:, xmin:xmax, ymin:ymax])
-		img_one = sliced.resize((224, 224), Image.ANTIALIAS)
-		img[batch] = transforms.ToTensor()(img_one)
+        patchs_cuda = torch.cat((patchs_cuda,img_variable),0)
 
-	return img
+    return patchs_cuda
 
-def select_max_connect(heatmap):
-	labeled_img, num = label(heatmap, connectivity=2, background=0, return_num=True)    
-	max_label = 0
-	max_num = 0
-	for i in range(1, num+1):
-		if np.sum(labeled_img == i) > max_num:
-			max_num = np.sum(labeled_img == i)
-			max_label = i
-	lcc = (labeled_img == max_label)
-	if max_num == 0:
-	   lcc = (labeled_img == -1)
-	lcc = lcc + 0
-	return lcc
+
+def binImage(heatmap, t = exp_cfg['threshold']):
+    _, heatmap_bin = cv2.threshold(heatmap , 0 , 255 , cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    # t in the paper
+    # _, heatmap_bin = cv2.threshold(heatmap , int(255 * 0.7), 255 , cv2.THRESH_BINARY)
+    return heatmap_bin
+
+
+def selectMaxConnect(heatmap):
+    labeled_img, num = label(heatmap, connectivity=2, background=0, return_num=True)    
+    max_label = 0
+    max_num = 0
+    for i in range(1, num+1):
+        if np.sum(labeled_img == i) > max_num:
+            max_num = np.sum(labeled_img == i)
+            max_label = i
+    lcc = (labeled_img == max_label)
+    if max_num == 0:
+       lcc = (labeled_img == -1)
+    lcc = lcc + 0
+    return lcc 
 
 def save_model(epoch, val_loss, model, optimizer, lr_scheduler, branch_name = 'global'):
 	save_dict = {
@@ -191,7 +205,7 @@ def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_
 		if branch_name == 'local':
 			with torch.no_grad():
 				output, heatmap, pool = test_model(image.cuda())
-				image = heatmap_crop_origin(heatmap.cpu(), image, exp_cfg['threshold'])
+				image = Attention_gen_patchs(image, heatmap.cpu())
 
 			del output, heatmap, pool
 			torch.cuda.empty_cache()
@@ -199,7 +213,7 @@ def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_
 		if branch_name == 'fusion':
 			with torch.no_grad():
 				output, heatmap, pool1 = test_model[0](image.cuda())
-				inputs = heatmap_crop_origin(heatmap.cpu(), image)
+				inputs = Attention_gen_patchs(image, heatmap.cpu())
 				output, heatmap, pool2 = test_model[1](inputs.cuda())
 				pool1 = pool1.view(pool1.size(0), -1)
 				pool2 = pool2.view(pool2.size(0), -1)
@@ -258,13 +272,13 @@ def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model
 
 			if branch_name == 'local':
 				output, heatmap, pool = test_model(image.cuda())
-				image = heatmap_crop_origin(heatmap.cpu(), image, exp_cfg['threshold'])
+				image = Attention_gen_patchs(image, heatmap.cpu())
 
 				del output, heatmap, pool
 
 			if branch_name == 'fusion':
 				output, heatmap, pool1 = test_model[0](image.cuda())
-				inputs = heatmap_crop_origin(heatmap.cpu(), image)
+				inputs = Attention_gen_patchs(image, heatmap.cpu())
 				output, heatmap, pool2 = test_model[1](inputs.cuda())
 				pool1 = pool1.view(pool1.size(0), -1)
 				pool2 = pool2.view(pool2.size(0), -1)
