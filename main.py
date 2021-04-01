@@ -25,7 +25,8 @@ from model import Net, FusionNet
 cudnn.benchmark = True
 
 def parse_args():
-	parser = argparse.ArgumentParser()
+	parser = argparse.ArgumentParser(description='AG-CNN')
+	parser.add_argument('--use', type=str, default='train', help='use for what (train or test)')
 	parser.add_argument("--exp_dir", type=str, default="./experiments/exp5")
 	parser.add_argument("--resume", "-r", action="store_true")
 	args = parser.parse_args()
@@ -61,6 +62,7 @@ DATASET_PATH = path.join('..', 'lung-disease-detection', 'data')
 IMAGES_DATA_PATH = path.join(DATASET_PATH, 'images')
 TRAIN_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'train_list.txt')
 VAL_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'val_list.txt')
+TEST_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'test_list.txt')
 
 MAX_BATCH_CAPACITY = {
 	'global' : 16,
@@ -346,6 +348,9 @@ def main():
 		val_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = VAL_IMAGE_LIST, transform = transform)
 		val_loader = DataLoader(dataset = val_dataset, batch_size = exp_cfg['batch_size'][branch_name]//2, shuffle = False, num_workers = 4)
 
+		test_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = TEST_IMAGE_LIST, transform = transform)
+		test_loader = DataLoader(dataset = test_dataset, batch_size = exp_cfg['batch_size'][branch_name]//2, shuffle = False, num_workers = 4)
+
 		if args.resume:
 
 			CKPT_PATH = path.join(exp_dir, exp_dir.split('/')[-1] + '_'+ branch_name + '.pth')
@@ -391,8 +396,16 @@ def main():
 
 			if branch_name == 'global':
 				GlobalModel = GlobalModel.to(device)
-				train(epoch, branch_name, GlobalModel, train_loader, optimizer_global, lr_scheduler_global, loss_global, None, batch_multiplier)
-				val(epoch, branch_name, GlobalModel, val_loader, optimizer_global, loss_global, None)
+
+				if args.use == 'train':
+					train(epoch, branch_name, GlobalModel, train_loader, optimizer_global, lr_scheduler_global, loss_global, None, batch_multiplier)
+					val_test_loader = val_loader
+				else:
+					save_dict_global = torch.load(os.path.join(exp_dir, exp_dir.split('/')[-1] + '_global_best' + '.pth'))
+					GlobalModel.load_state_dict(save_dict_global['net'])
+					val_test_loader = test_loader
+
+				val(epoch, branch_name, GlobalModel, val_test_loader, optimizer_global, loss_global, None)
 
 			if branch_name == 'local':
 
@@ -402,8 +415,16 @@ def main():
 				GlobalModelTest.load_state_dict(save_dict_global['net'])
 
 				LocalModel = LocalModel.to(device)
-				train(epoch, branch_name, LocalModel, train_loader, optimizer_local, lr_scheduler_local, loss_local, GlobalModelTest, batch_multiplier)
-				val(epoch, branch_name, LocalModel, val_loader, optimizer_local, loss_local, GlobalModelTest)
+
+				if args.use == 'train':
+					train(epoch, branch_name, LocalModel, train_loader, optimizer_local, lr_scheduler_local, loss_local, GlobalModelTest, batch_multiplier)
+					val_test_loader = val_loader
+				else:
+					save_dict_local = torch.load(os.path.join(exp_dir, exp_dir.split('/')[-1] + '_local_best' + '.pth'))
+					LocalModel.load_state_dict(save_dict_local['net'])
+					val_test_loader = test_loader
+
+				val(epoch, branch_name, LocalModel, val_test_loader, optimizer_local, loss_local, GlobalModelTest)
 			
 			if branch_name == 'fusion':
 
@@ -417,8 +438,17 @@ def main():
 				LocalModelTest.load_state_dict(save_dict_local['net'])
 
 				FusionModel = FusionModel.to(device)
-				train(epoch, branch_name, FusionModel, train_loader, optimizer_fusion, lr_scheduler_fusion, loss_fusion, (GlobalModelTest, LocalModelTest), batch_multiplier)
-				val(epoch, branch_name, FusionModel, val_loader, optimizer_fusion, loss_fusion, (GlobalModelTest, LocalModelTest))
+
+				if args.use == 'train':
+					train(epoch, branch_name, FusionModel, train_loader, optimizer_fusion, lr_scheduler_fusion, loss_fusion, (GlobalModelTest, LocalModelTest), batch_multiplier)
+					val_test_loader = val_loader
+
+				elif args.use == 'test':
+					save_dict_fusion = torch.load(os.path.join(exp_dir, exp_dir.split('/')[-1] + '_fusion_best' + '.pth'))
+					LocalModel.load_state_dict(save_dict_local['net'])
+					val_test_loader = test_loader
+
+				val(epoch, branch_name, FusionModel, val_test_loader, optimizer_fusion, loss_fusion, (GlobalModelTest, LocalModelTest))
 
 		print(" Training " + branch_name + " branch done.")
 
