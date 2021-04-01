@@ -309,12 +309,13 @@ def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model
 		epoch_val_loss = float(running_loss) / float(count)
 		print(' Epoch over Loss: {:.5f}'.format(epoch_val_loss))
 
-		if epoch_val_loss < BEST_VAL_LOSS[branch_name]:
-			BEST_VAL_LOSS[branch_name] = epoch_val_loss
-			save_name = path.join(exp_dir, exp_dir.split('/')[-1] + '_' + branch_name + '.pth')
-			copy_name = os.path.join(exp_dir, exp_dir.split('/')[-1] + '_' + branch_name + '_best.pth')
-			shutil.copyfile(save_name, copy_name)
-			print(" Best model is saved: {}".format(copy_name))
+		if args.use == 'train':
+			if epoch_val_loss < BEST_VAL_LOSS[branch_name]:
+				BEST_VAL_LOSS[branch_name] = epoch_val_loss
+				save_name = path.join(exp_dir, exp_dir.split('/')[-1] + '_' + branch_name + '.pth')
+				copy_name = os.path.join(exp_dir, exp_dir.split('/')[-1] + '_' + branch_name + '_best.pth')
+				shutil.copyfile(save_name, copy_name)
+				print(" Best model is saved: {}".format(copy_name))
 
 		AUROCs = compute_AUCs(gt, pred)
 		print("|=======================================|")
