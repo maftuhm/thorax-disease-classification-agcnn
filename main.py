@@ -392,7 +392,12 @@ def main():
 		else:
 			start_epoch = 0
 
-		for epoch in range(start_epoch, exp_cfg['NUM_EPOCH']):
+		if args.use == 'train':
+			max_epoch = exp_cfg['NUM_EPOCH']
+		elif args.use == 'test':
+			max_epoch = 1
+
+		for epoch in range(start_epoch, max_epoch):
 
 			if branch_name == 'global':
 				GlobalModel = GlobalModel.to(device)
@@ -400,7 +405,7 @@ def main():
 				if args.use == 'train':
 					train(epoch, branch_name, GlobalModel, train_loader, optimizer_global, lr_scheduler_global, loss_global, None, batch_multiplier)
 					val_test_loader = val_loader
-				else:
+				elif args.use == 'test':
 					save_dict_global = torch.load(os.path.join(exp_dir, exp_dir.split('/')[-1] + '_global_best' + '.pth'))
 					GlobalModel.load_state_dict(save_dict_global['net'])
 					val_test_loader = test_loader
@@ -419,7 +424,7 @@ def main():
 				if args.use == 'train':
 					train(epoch, branch_name, LocalModel, train_loader, optimizer_local, lr_scheduler_local, loss_local, GlobalModelTest, batch_multiplier)
 					val_test_loader = val_loader
-				else:
+				elif args.use == 'test':
 					save_dict_local = torch.load(os.path.join(exp_dir, exp_dir.split('/')[-1] + '_local_best' + '.pth'))
 					LocalModel.load_state_dict(save_dict_local['net'])
 					val_test_loader = test_loader
