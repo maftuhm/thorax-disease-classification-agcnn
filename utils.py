@@ -10,13 +10,13 @@ from skimage.measure import label
 import torch
 import torchvision.transforms as transforms
 
-def AttentionGenPatchs(ori_image, fm_cuda):
+def AttentionGenPatchs(ori_image, fm_cuda, size_crop = (224, 224)):
 
 	feature_conv = fm_cuda.data.cpu().numpy()
 
 	bz, nc, h, w = feature_conv.shape
 
-	images = torch.randn(bz, 3, 224, 224)
+	images = torch.randn(bz, 3, size_crop[0], size_crop[1])
 
 	for i in range(bz):
 		feature = np.abs(feature_conv[i])
@@ -24,7 +24,7 @@ def AttentionGenPatchs(ori_image, fm_cuda):
 		heatmap = (heatmap - np.min(heatmap)) / np.max(heatmap)
 		heatmap = np.uint8(255 * heatmap)
 
-		resized_heatmap = cv2.resize(heatmap, (224, 224))
+		resized_heatmap = cv2.resize(heatmap, size_crop)
 		_, heatmap_bin = cv2.threshold(resized_heatmap , 0 , 255 , cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 		# _, heatmap_bin = cv2.threshold(resized_heatmap , int(255 * 0.7) , 255 , cv2.THRESH_BINARY)
 		heatmap_maxconn = selectMaxConnect(heatmap_bin)
@@ -38,7 +38,7 @@ def AttentionGenPatchs(ori_image, fm_cuda):
 
 		image = ori_image[i].numpy().transpose(1, 2, 0)
 		image_crop = image[minh:maxh, minw:maxw, :]
-		image_crop = cv2.resize(image_crop, (224, 224))
+		image_crop = cv2.resize(image_crop, size_crop)
 		image_crop = Image.fromarray(image_crop.astype('uint8')).convert("RGB")
 		images[i] = transforms.ToTensor()(image_crop)
 
@@ -58,11 +58,10 @@ def selectMaxConnect(heatmap):
 	lcc = lcc + 0
 	return lcc 
 
-def save_model(exp_dir, epoch, val_loss, model, optimizer, lr_scheduler, branch_name = 'global'):
+def save_model(exp_dir, epoch, model, optimizer, lr_scheduler, branch_name = 'global'):
 	save_dict = {
 		"epoch": epoch,
-		'loss' : val_loss,
-		"net": model.cpu().state_dict(),
+		"net": model.state_dict(),
 		"optim": optimizer.state_dict(),
 		"lr_scheduler": lr_scheduler.state_dict()
 	}
@@ -86,6 +85,6 @@ def compute_AUCs(gt, pred):
 	AUROCs = []
 	gt_np = gt.cpu().numpy()
 	pred_np = pred.cpu().numpy()
-	for i in range(len(CLASS_NAMES)):
+	for i in range(14):
 		AUROCs.append(roc_auc_score(gt_np[:, i], pred_np[:, i]))
 	return AUROCs

@@ -20,7 +20,7 @@ from utils import *
 def parse_args():
 	parser = argparse.ArgumentParser(description='AG-CNN')
 	parser.add_argument('--use', type=str, default='train', help='use for what (train or test)')
-	parser.add_argument("--exp_dir", type=str, default="./experiments/exp5")
+	parser.add_argument("--exp_dir", type=str, default="./experiments/exp6")
 	parser.add_argument("--resume", "-r", action="store_true")
 	args = parser.parse_args()
 	return args
@@ -38,10 +38,10 @@ classes_name = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mas
 
 max_batch_capacity = 8
 
-best_loss = {
-	'global': 1000,
-	'local': 1000,
-	'fusion': 1000
+best_AUCs = {
+	'global': -1000,
+	'local': -1000,
+	'fusion': -1000
 }
 
 cudnn.benchmark = True
@@ -107,7 +107,6 @@ def main():
 		if path.isfile(checkpoint_global):
 			save_dict = torch.load(checkpoint_global)
 			start_epoch = max(save_dict['epoch'], start_epoch)
-			best_loss['global'] = save_dict['loss']
 			GlobalModel.load_state_dict(save_dict['net'])
 			optimizer_global.load_state_dict(save_dict['optim'])
 			lr_scheduler_global.load_state_dict(save_dict['lr_scheduler'])
@@ -116,7 +115,6 @@ def main():
 		if path.isfile(checkpoint_local):
 			save_dict = torch.load(checkpoint_local)
 			start_epoch = max(save_dict['epoch'], start_epoch)
-			best_loss['local'] = save_dict['loss']
 			LocalModel.load_state_dict(save_dict['net'])
 			optimizer_local.load_state_dict(save_dict['optim'])
 			lr_scheduler_local.load_state_dict(save_dict['lr_scheduler'])
@@ -125,7 +123,6 @@ def main():
 		if path.isfile(checkpoint_fusion):
 			save_dict = torch.load(checkpoint_fusion)
 			start_epoch = max(save_dict['epoch'], start_epoch)
-			best_loss['fusion'] = save_dict['loss']
 			FusionModel.load_state_dict(save_dict['net'])
 			optimizer_fusion.load_state_dict(save_dict['optim'])
 			lr_scheduler_fusion.load_state_dict(save_dict['lr_scheduler'])
@@ -141,7 +138,7 @@ def main():
 	FusionModel = FusionModel.to(device)
 
 	for epoch in range(start_epoch, exp_cfg['NUM_EPOCH']):
-		print('Epoch [{}/{}]\tTotal Iterasi [{}]'.format(epoch , exp_cfg['NUM_EPOCH'] - 1, len(train_loader)))
+		print(' Epoch [{}/{}]'.format(epoch , exp_cfg['NUM_EPOCH'] - 1))
 
 		GlobalModel.train()
 		LocalModel.train()
@@ -150,6 +147,9 @@ def main():
 		running_loss = 0.
 		mini_batch_loss = 0.
 
+		count = 0
+		batch_multiplier = 16
+
 		progressbar = tqdm(range(len(train_loader)))
 
 		for i, (image, target) in enumerate(train_loader):
@@ -157,14 +157,21 @@ def main():
 			image_cuda = image.to(device)
 			target_cuda = target.to(device)
 
-			optimizer_global.zero_grad()
-			optimizer_local.zero_grad()
-			optimizer_fusion.zero_grad()
+			if count == 0:
+				optimizer_global.step()
+				optimizer_local.step()
+				optimizer_fusion.step()
+
+				optimizer_global.zero_grad()
+				optimizer_local.zero_grad()
+				optimizer_fusion.zero_grad()
+
+				count = batch_multiplier
 
 			# compute output
 			output_global, fm_global, pool_global = GlobalModel(image_cuda)
 			
-			image_patch = AttentionGenPatchs(image_cuda.cpu(), fm_global).to(device)
+			image_patch = AttentionGenPatchs(image_cuda.cpu(), fm_global, tuple(exp_cfg['dataset']['crop'])).to(device)
 
 			output_local, _, pool_local = LocalModel(image_patch)
 
@@ -175,17 +182,14 @@ def main():
 			loss_local = criterion(output_local, target_cuda)
 			loss_fusion = criterion(output_fusion, target_cuda)
 
-			loss = loss_global + loss_local + loss_fusion
+			loss = (loss_global + loss_local + loss_fusion) / batch_multiplier
 			loss.backward()
-
-			optimizer_global.step()
-			optimizer_local.step()
-			optimizer_fusion.step()
+			count -= 1
 			
-			progressbar.set_description("bacth loss: {loss:.5f} "
+			progressbar.set_description(" bacth loss: {loss:.3f} "
 										"loss1: {loss1:.3f} "
 										"loss2: {loss2:.3f} "
-										"loss3: {loss3:.3f}".format(loss = loss,
+										"loss3: {loss3:.3f}".format(loss = loss * batch_multiplier,
 																	loss1 = loss_global,
 																	loss2 = loss_local,
 																	loss3 = loss_fusion))
@@ -199,88 +203,109 @@ def main():
 		lr_scheduler_local.step()
 		lr_scheduler_fusion.step()
 
+		# SAVE MODEL
+		save_model(args.exp_dir, epoch,
+					model = GlobalModel,
+					optimizer = optimizer_global,
+					lr_scheduler = lr_scheduler_global,
+					branch_name = 'global')
+		save_model(args.exp_dir, epoch,
+					model = LocalModel,
+					optimizer = optimizer_local,
+					lr_scheduler = lr_scheduler_local,
+					branch_name = 'local')
+		save_model(args.exp_dir, epoch,
+					model = FusionModel,
+					optimizer = optimizer_fusion,
+					lr_scheduler = lr_scheduler_fusion,
+					branch_name = 'fusion')
+
 		epoch_train_loss = float(running_loss) / float(i)
 		print(' Epoch over Loss: {:.5f}'.format(epoch_train_loss))
+		test(GlobalModel, LocalModel, FusionModel, test_loader)
 
-def val(epoch, data_loader):
+def test(GlobalModel, LocalModel, FusionModel, test_loader):
 
 	GlobalModel.eval()
 	LocalModel.eval()
 	FusionModel.eval()
 
-	ground_truth = torch.FloatTensor()
-	pred_global = torch.FloatTensor()
-	pred_local = torch.FloatTensor()
-	pred_fusion = torch.FloatTensor()
+	ground_truth = torch.FloatTensor().to(device)
+	pred_global = torch.FloatTensor().to(device)
+	pred_local = torch.FloatTensor().to(device)
+	pred_fusion = torch.FloatTensor().to(device)
 
-	running_loss = 0.
-	progressbar = tqdm(range(len(data_loader)))
+	progressbar = tqdm(range(len(test_loader)))
 
 	with torch.no_grad():
-		for i, (image, target) in enumerate(data_loader):
+		for i, (image, target) in enumerate(test_loader):
 
 			image_cuda = image.to(device)
 			target_cuda = target.to(device)
-			ground_truth = torch.cat((ground_truth, target), 0)
+			ground_truth = torch.cat((ground_truth, target_cuda), 0)
 
 			# compute output
 			output_global, fm_global, pool_global = GlobalModel(image_cuda)
 			
-			image_patch = AttentionGenPatchs(image_cuda.cpu(), fm_global).to(device)
+			image_patch = AttentionGenPatchs(image_cuda.cpu(), fm_global, tuple(exp_cfg['dataset']['crop'])).to(device)
 
 			output_local, _, pool_local = LocalModel(image_patch)
 
 			output_fusion = FusionModel(pool_global, pool_local)
-
-			# loss
-			loss_global = criterion(output_global, target_cuda)
-			loss_local = criterion(output_local, target_cuda)
-			loss_fusion = criterion(output_fusion, target_cuda)
-
-			loss = loss_global + loss_local + loss_fusion
-
 			
 			pred_global = torch.cat((pred_global, output_global.data), 0)
 			pred_local = torch.cat((pred_local, output_local.data), 0)
 			pred_fusion = torch.cat((pred_fusion, output_fusion.data), 0)
 
-			running_loss += loss.data.item()
-
-			progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch,  exp_cfg['NUM_EPOCH'] - 1, loss.data.item()))
 			progressbar.update(1)
-			# writer.add_scalar('val/' + branch_name + ' loss', loss.data.item(), epoch * len(data_loader) + i)
 
 		progressbar.close()
-		
-		epoch_val_loss = float(running_loss) / float(i)
-		print(' Epoch over Loss: {:.5f}'.format(epoch_val_loss))
 
-		if args.use == 'train':
-			if epoch_val_loss < BEST_VAL_LOSS[branch_name]:
-				BEST_VAL_LOSS[branch_name] = epoch_val_loss
-				save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_' + branch_name + '.pth')
-				copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_' + branch_name + '_best.pth')
-				shutil.copyfile(save_name, copy_name)
-				print(" Best model is saved: {}".format(copy_name))
+	AUROCs_global = compute_AUCs(ground_truth, pred_global)
+	AUROCs_global_avg = np.array(AUROCs_global).mean()
+	AUROCs_local = compute_AUCs(ground_truth, pred_local)
+	AUROCs_local_avg = np.array(AUROCs_local).mean()
+	AUROCs_fusion = compute_AUCs(ground_truth, pred_fusion)
+	AUROCs_fusion_avg = np.array(AUROCs_fusion).mean()
 
-		AUROCs = compute_AUCs(gt, pred)
-		print("|=======================================|")
-		print("|\t\t  AUROC\t\t\t|")
-		print("|=======================================|")
-		print("|\t      global branch\t\t|")
-		print("|---------------------------------------|")
-		for i in range(len(CLASS_NAMES)):
-			if len(CLASS_NAMES[i]) < 6:
-				print("| {}\t\t\t|".format(CLASS_NAMES[i]), end="")
-			elif len(CLASS_NAMES[i]) > 14:
-				print("| {}\t|".format(CLASS_NAMES[i]), end="")
-			else:
-				print("| {}\t\t|".format(CLASS_NAMES[i]), end="")
-			print("  {:.10f}\t|".format(AUROCs[i]))
-		print("|---------------------------------------|")
-		print("| Average\t\t|  {:.10f}\t|".format(np.array(AUROCs).mean()))
-		print("|=======================================|")
-		print()
+	if AUROCs_global_avg > best_AUCs['global']:
+		best_AUCs['global'] = AUROCs_global_avg
+		save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global.pth')
+		copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global_best.pth')
+		shutil.copyfile(save_name, copy_name)
+		print(" Global best model is saved: {}".format(copy_name))
+
+	if AUROCs_local_avg > best_AUCs['local']:
+		best_AUCs['local'] = AUROCs_local_avg
+		save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_local.pth')
+		copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_local_best.pth')
+		shutil.copyfile(save_name, copy_name)
+		print(" Local best model is saved: {}".format(copy_name))
+
+	if AUROCs_fusion_avg > best_AUCs['fusion']:
+		best_AUCs['fusion'] = AUROCs_fusion_avg
+		save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_fusion.pth')
+		copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_fusion_best.pth')
+		shutil.copyfile(save_name, copy_name)
+		print(" Fusion best model is saved: {}".format(copy_name))
+
+	print("|===============================================================================================|")
+	print("|\t\t\t\t\t    AUROC\t\t\t\t\t\t|")
+	print("|===============================================================================================|")
+	print("|\t\t\t|  Global branch\t|  Local branch\t\t|  Fusion branch\t|")
+	print("|-----------------------------------------------------------------------------------------------|")
+	for i in range(len(classes_name)):
+		if len(classes_name[i]) < 6:
+			print("| {}\t\t\t|".format(classes_name[i]), end="")
+		elif len(classes_name[i]) > 14:
+			print("| {}\t|".format(classes_name[i]), end="")
+		else:
+			print("| {}\t\t|".format(classes_name[i]), end="")
+		print("  {:.10f}\t\t|  {:.10f}\t\t|  {:.10f}\t\t|".format(AUROCs_global[i], AUROCs_local[i], AUROCs_fusion[i]))
+	print("|-----------------------------------------------------------------------------------------------|")
+	print("| Average\t\t|  {:.10f}\t\t|  {:.10f}\t\t|  {:.10f}\t\t|".format(np.array(AUROCs_global).mean(), np.array(AUROCs_local).mean(), np.array(AUROCs_fusion).mean()))
+	print("|===============================================================================================|")
+	print()
 
 if __name__ == "__main__":
 	main()
