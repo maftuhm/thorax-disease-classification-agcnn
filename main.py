@@ -32,11 +32,11 @@ with open(path.join(args.exp_dir, "cfg.json")) as f:
 	exp_cfg = json.load(f)
 
 # ================= CONSTANTS ================= #
-data_dir = path.join('D:/', 'Data', 'data')
+data_dir = path.join('..', 'lung-disease-detection', 'data')
 classes_name = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass', 'Nodule', 'Pneumonia',
 				'Pneumothorax', 'Consolidation', 'Edema', 'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia']
 
-max_batch_capacity = 2
+max_batch_capacity = 8
 
 best_loss = {
 	'global': 1000,
@@ -44,26 +44,9 @@ best_loss = {
 	'fusion': 1000
 }
 
+cudnn.benchmark = True
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 # writer = SummaryWriter(args.exp_dir + '/log')
-
-# ================= MODELS ================= #
-GlobalModel = Net(exp_cfg['backbone']).to(device)
-LocalModel = Net(exp_cfg['backbone']).to(device)
-FusionModel = FusionNet(exp_cfg['backbone']).to(device)
-
-# ================= OPTIMIZER ================= #
-optimizer_global = optim.SGD(GlobalModel.parameters(), **exp_cfg['optimizer']['SGD'])
-optimizer_local = optim.SGD(LocalModel.parameters(), **exp_cfg['optimizer']['SGD'])
-optimizer_fusion = optim.SGD(FusionModel.parameters(), **exp_cfg['optimizer']['SGD'])
-
-# ================= SCHEDULER ================= #
-lr_scheduler_global = optim.lr_scheduler.StepLR(optimizer_global , **exp_cfg['lr_scheduler'])
-lr_scheduler_local = optim.lr_scheduler.StepLR(optimizer_local , **exp_cfg['lr_scheduler'])
-lr_scheduler_fusion = optim.lr_scheduler.StepLR(optimizer_fusion , **exp_cfg['lr_scheduler'])
-
-# ================= LOSS FUNCTION ================= #
-criterion = nn.BCELoss()
 
 def main():
 	# ================= TRANSFORMS ================= #
@@ -96,6 +79,24 @@ def main():
 
 	test_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'test', transform = transform_test)
 	test_loader = DataLoader(dataset = test_dataset, batch_size = 64, shuffle = False, num_workers = 4)
+
+	# ================= MODELS ================= #
+	GlobalModel = Net(exp_cfg['backbone'])
+	LocalModel = Net(exp_cfg['backbone'])
+	FusionModel = FusionNet(exp_cfg['backbone'])
+
+	# ================= OPTIMIZER ================= #
+	optimizer_global = optim.SGD(GlobalModel.parameters(), **exp_cfg['optimizer']['SGD'])
+	optimizer_local = optim.SGD(LocalModel.parameters(), **exp_cfg['optimizer']['SGD'])
+	optimizer_fusion = optim.SGD(FusionModel.parameters(), **exp_cfg['optimizer']['SGD'])
+
+	# ================= SCHEDULER ================= #
+	lr_scheduler_global = optim.lr_scheduler.StepLR(optimizer_global , **exp_cfg['lr_scheduler'])
+	lr_scheduler_local = optim.lr_scheduler.StepLR(optimizer_local , **exp_cfg['lr_scheduler'])
+	lr_scheduler_fusion = optim.lr_scheduler.StepLR(optimizer_fusion , **exp_cfg['lr_scheduler'])
+
+	# ================= LOSS FUNCTION ================= #
+	criterion = nn.BCELoss()
 
 	if args.resume:
 		start_epoch = 0
@@ -134,6 +135,10 @@ def main():
 
 	else:
 		start_epoch = 0
+
+	GlobalModel = GlobalModel.to(device)
+	LocalModel = LocalModel.to(device)
+	FusionModel = FusionModel.to(device)
 
 	for epoch in range(start_epoch, exp_cfg['NUM_EPOCH']):
 		print('Epoch [{}/{}]\tTotal Iterasi [{}]'.format(epoch , exp_cfg['NUM_EPOCH'] - 1, len(train_loader)))
@@ -177,14 +182,13 @@ def main():
 			optimizer_local.step()
 			optimizer_fusion.step()
 			
-			progressbar.set_description("bacth loss: {loss:.5f} " +
-										"loss1: {loss1:.3f} " +
-										"loss2: {loss2:.3f} " +
+			progressbar.set_description("bacth loss: {loss:.5f} "
+										"loss1: {loss1:.3f} "
+										"loss2: {loss2:.3f} "
 										"loss3: {loss3:.3f}".format(loss = loss,
-																	loss1 = loss1,
-																	loss2 = loss2,
-																	loss3 = loss3))
-
+																	loss1 = loss_global,
+																	loss2 = loss_local,
+																	loss3 = loss_fusion))
 			progressbar.update(1)
 
 			running_loss += loss.data.item()
