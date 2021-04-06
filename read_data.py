@@ -5,7 +5,7 @@ import os
 
 
 class ChestXrayDataSet(Dataset):
-    def __init__(self, data_dir, image_list_file, transform=None):
+    def __init__(self, data_dir, split, transform=None):
         """
         Args:
             data_dir: path to image directory.
@@ -13,15 +13,17 @@ class ChestXrayDataSet(Dataset):
                 with corresponding labels.
             transform: optional transform to be applied on a sample.
         """
+        assert split in {'train', 'test', 'val'}
+        
         image_names = []
         labels = []
-        with open(image_list_file, "r") as f:
+        with open(os.path.join(data_dir, 'labels', split + '_list.txt'), "r") as f:
             for line in f:
                 items = line.split()
                 image_name= items[0]
                 label = items[1:]
                 label = [int(i) for i in label]
-                image_name = os.path.join(data_dir, image_name)
+                image_name = os.path.join(data_dir, 'images', image_name)
                 image_names.append(image_name)
                 labels.append(label)
 
