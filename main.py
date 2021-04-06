@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 import torch.backends.cudnn as cudnn
 
 import torchvision.transforms as transforms
@@ -40,16 +40,24 @@ with open(path.join(exp_dir, "cfg.json")) as f:
 	exp_cfg = json.load(f)
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-writer = SummaryWriter(exp_dir + '/log')
+# writer = SummaryWriter(exp_dir + '/log')
 
 normalize = transforms.Normalize(
    mean=[0.485, 0.456, 0.406],
    std=[0.229, 0.224, 0.225]
 )
 
-transform = transforms.Compose([
+transform_train = transforms.Compose([
    transforms.Resize(tuple(exp_cfg['dataset']['resize'])),
    transforms.RandomResizedCrop(tuple(exp_cfg['dataset']['crop'])),
+   transforms.RandomHorizontalFlip(),
+   transforms.ToTensor(),
+   normalize,
+])
+
+transform_test = transforms.Compose([
+   transforms.Resize(tuple(exp_cfg['dataset']['resize'])),
+   transforms.CenterCrop(tuple(exp_cfg['dataset']['crop'])),
    transforms.ToTensor(),
    normalize,
 ])
@@ -58,24 +66,23 @@ transform = transforms.Compose([
 CLASS_NAMES = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass', 'Nodule', 'Pneumonia',
 				'Pneumothorax', 'Consolidation', 'Edema', 'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia']
 
-DATASET_PATH = path.join('..', 'lung-disease-detection', 'data')
+DATASET_PATH = path.join('D:/', 'Data', 'data')
 IMAGES_DATA_PATH = path.join(DATASET_PATH, 'images')
 TRAIN_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'train_list.txt')
 VAL_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'val_list.txt')
 TEST_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'test_list.txt')
 
-MAX_BATCH_CAPACITY = {
-	'global' : 16,
-	'local' : 8,
-	'fusion' : 8
-}
-# batch_multiplier = exp_cfg['batch_size']['global'] // MAX_BATCH_CAPACITY
+MAX_BATCH_CAPACITY = 2
 
-# train_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = TRAIN_IMAGE_LIST, transform = transform)
-# train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = True, num_workers = 4)
+train_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = TRAIN_IMAGE_LIST, transform = transform_train)
+train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = True, num_workers = 4)
 
-# val_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = VAL_IMAGE_LIST, transform = transform)
-# val_loader = DataLoader(dataset = val_dataset, batch_size = exp_cfg['batch_size']['global'], shuffle = False, num_workers = 4)
+val_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = VAL_IMAGE_LIST, transform = transform_test)
+val_loader = DataLoader(dataset = val_dataset, batch_size = 64, shuffle = False, num_workers = 4)
+
+test_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = TEST_IMAGE_LIST, transform = transform_test)
+test_loader = DataLoader(dataset = test_dataset, batch_size = 64, shuffle = False, num_workers = 4)
+
 
 BRANCH_NAME_LIST = ['global', 'local', 'fusion']
 BEST_VAL_LOSS = {
@@ -85,9 +92,9 @@ BEST_VAL_LOSS = {
 }
 
 #-------------------- SETTINGS: MODEL
-GlobalModel = Net(exp_cfg['backbone'])
-LocalModel = Net(exp_cfg['backbone'])
-FusionModel = FusionNet(exp_cfg['backbone'])
+GlobalModel = Net(exp_cfg['backbone']).to(device)
+LocalModel = Net(exp_cfg['backbone']).to(device)
+FusionModel = FusionNet(exp_cfg['backbone']).to(device)
 
 #-------------------- SETTINGS: OPTIMIZER & SCHEDULER
 optimizer_global = optim.SGD(GlobalModel.parameters(), **exp_cfg['optimizer']['SGD'])
@@ -99,72 +106,55 @@ lr_scheduler_local = optim.lr_scheduler.StepLR(optimizer_local , **exp_cfg['lr_s
 lr_scheduler_fusion = optim.lr_scheduler.StepLR(optimizer_fusion , **exp_cfg['lr_scheduler'])
 
 #-------------------- SETTINGS: LOSS FUNCTION
-loss_global = nn.BCELoss()
-loss_local = nn.BCELoss()
-loss_fusion = nn.BCELoss()
+criterion = nn.BCELoss()
 
-def Attention_gen_patchs(ori_image, fm_cuda):
-    # feature map -> feature mask (using feature map to crop on the original image) -> crop -> patchs
-    feature_conv = fm_cuda.data.cpu().numpy()
-    size_upsample = (224, 224) 
-    bz, nc, h, w = feature_conv.shape
+def AttentionGenPatchs(ori_image, fm_cuda):
 
-    patchs_cuda = torch.FloatTensor().cuda()
+	feature_conv = fm_cuda.data.cpu().numpy()
 
-    for i in range(0, bz):
-        feature = feature_conv[i]
-        cam = feature.reshape((nc, h*w))
-        cam = cam.sum(axis=0)
-        cam = cam.reshape(h,w)
-        cam = cam - np.min(cam)
-        cam_img = cam / np.max(cam)
-        cam_img = np.uint8(255 * cam_img)
+	bz, nc, h, w = feature_conv.shape
 
-        heatmap_bin = binImage(cv2.resize(cam_img, size_upsample))
-        heatmap_maxconn = selectMaxConnect(heatmap_bin)
-        heatmap_mask = heatmap_bin * heatmap_maxconn
+	images = torch.randn(bz, 3, 224, 224)
 
-        ind = np.argwhere(heatmap_mask != 0)
-        minh = min(ind[:,0])
-        minw = min(ind[:,1])
-        maxh = max(ind[:,0])
-        maxw = max(ind[:,1])
-        
-        # to ori image 
-        image = ori_image[i].numpy().reshape(224,224,3)
-        image = image[int(224*0.334):int(224*0.667),int(224*0.334):int(224*0.667),:]
+	for i in range(bz):
+		feature = np.abs(feature_conv[i])
+		heatmap = np.max(feature, axis = 0)
+		heatmap = (heatmap - np.min(heatmap)) / np.max(heatmap)
+		heatmap = np.uint8(255 * heatmap)
 
-        image = cv2.resize(image, size_upsample)
-        image_crop = image[minh:maxh,minw:maxw,:] * 256 # because image was normalized before
-        image_crop = transform(Image.fromarray(image_crop.astype('uint8')).convert('RGB')) 
+		resized_heatmap = cv2.resize(heatmap, (224, 224))
+		_, heatmap_bin = cv2.threshold(resized_heatmap , 0 , 255 , cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+		# _, heatmap_bin = cv2.threshold(resized_heatmap , int(255 * 0.7) , 255 , cv2.THRESH_BINARY)
+		heatmap_maxconn = selectMaxConnect(heatmap_bin)
+		heatmap_mask = heatmap_bin * heatmap_maxconn
 
-        img_variable = torch.autograd.Variable(image_crop.reshape(3,224,224).unsqueeze(0).cuda())
+		ind = np.argwhere(heatmap_mask != 0)
+		minh = min(ind[:,0])
+		minw = min(ind[:,1])
+		maxh = max(ind[:,0])
+		maxw = max(ind[:,1])
 
-        patchs_cuda = torch.cat((patchs_cuda,img_variable),0)
+		image = ori_image[i].numpy().transpose(1, 2, 0)
+		image_crop = image[minh:maxh, minw:maxw, :]
+		image_crop = cv2.resize(image_crop, (224, 224))
+		image_crop = Image.fromarray(image_crop.astype('uint8')).convert("RGB")
+		images[i] = transforms.ToTensor()(image_crop)
 
-    return patchs_cuda
-
-
-def binImage(heatmap, t = exp_cfg['threshold']):
-    _, heatmap_bin = cv2.threshold(heatmap , 0 , 255 , cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-    # t in the paper
-    # _, heatmap_bin = cv2.threshold(heatmap , int(255 * 0.7), 255 , cv2.THRESH_BINARY)
-    return heatmap_bin
-
+	return images
 
 def selectMaxConnect(heatmap):
-    labeled_img, num = label(heatmap, connectivity=2, background=0, return_num=True)    
-    max_label = 0
-    max_num = 0
-    for i in range(1, num+1):
-        if np.sum(labeled_img == i) > max_num:
-            max_num = np.sum(labeled_img == i)
-            max_label = i
-    lcc = (labeled_img == max_label)
-    if max_num == 0:
-       lcc = (labeled_img == -1)
-    lcc = lcc + 0
-    return lcc 
+	labeled_img, num = label(heatmap, connectivity=2, background=0, return_num=True)    
+	max_label = 0
+	max_num = 0
+	for i in range(1, num+1):
+		if np.sum(labeled_img == i) > max_num:
+			max_num = np.sum(labeled_img == i)
+			max_label = i
+	lcc = (labeled_img == max_label)
+	if max_num == 0:
+	   lcc = (labeled_img == -1)
+	lcc = lcc + 0
+	return lcc 
 
 def save_model(epoch, val_loss, model, optimizer, lr_scheduler, branch_name = 'global'):
 	save_dict = {
@@ -186,127 +176,122 @@ def compute_AUCs(gt, pred):
 		AUROCs.append(roc_auc_score(gt_np[:, i], pred_np[:, i]))
 	return AUROCs
 
-def train(epoch, branch_name, model, data_loader, optimizer, lr_scheduler, loss_func, test_model, batch_multiplier):
-
-	print(" Training {} model using lr = {}".format(branch_name, lr_scheduler.get_last_lr()))
-
-	model.train()
-	count = 0
+def train(epoch):
+	
+	GlobalModel.train()
+	LocalModel.train()
+	FusionModel.train()
+	
 	running_loss = 0.
 	mini_batch_loss = 0.
 
-	progressbar = tqdm(range(len(data_loader)))
+	progressbar = tqdm(range(len(train_loader)))
 
-	for i, (image, target) in enumerate(data_loader):
+	for i, (image, target) in enumerate(train_loader):
+
+		image_cuda = image.to(device)
+		target_cuda = target.to(device)
+
+		optimizer_global.zero_grad()
+		optimizer_local.zero_grad()
+		optimizer_fusion.zero_grad()
+
+		# compute output
+		output_global, fm_global, pool_global = GlobalModel(image_cuda)
 		
-		# optimizer.zero_grad()
-		if (count + 1) % batch_multiplier == 0:
-			optimizer.step()
-			optimizer.zero_grad()
+		image_patch = AttentionGenPatchs(image_cuda.cpu(), fm_global).to(device)
 
-		if branch_name == 'local':
-			with torch.no_grad():
-				output, heatmap, pool = test_model(image.cuda())
-				image = Attention_gen_patchs(image, heatmap.cpu())
+		output_local, _, pool_local = LocalModel(image_patch)
 
-			del output, heatmap, pool
-			torch.cuda.empty_cache()
+		output_fusion = FusionModel(pool_global, pool_local)
 
-		if branch_name == 'fusion':
-			with torch.no_grad():
-				output, heatmap, pool1 = test_model[0](image.cuda())
-				inputs = Attention_gen_patchs(image, heatmap.cpu())
-				output, heatmap, pool2 = test_model[1](inputs.cuda())
-				pool1 = pool1.view(pool1.size(0), -1)
-				pool2 = pool2.view(pool2.size(0), -1)
-				image = torch.cat((pool1.cpu(), pool2.cpu()), dim=1)
+		# loss
+		loss_global = criterion(output_global, target_cuda)
+		loss_local = criterion(output_local, target_cuda)
+		loss_fusion = criterion(output_fusion, target_cuda)
 
-			del output, heatmap, pool1, pool2, inputs
-			torch.cuda.empty_cache()
-
-		image = image.cuda()
-		target = target.cuda()
-
-		output, heatmap, pool = model(image)
-		loss = loss_func(output, target) / batch_multiplier
+		loss = loss_global + loss_local + loss_fusion
 		loss.backward()
-		# optimizer.step()
 
-		running_loss += loss.data.item() * batch_multiplier
-		mini_batch_loss += loss.data.item()
-		count += 1
-
-		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch, exp_cfg['NUM_EPOCH'] - 1, loss.data.item() * batch_multiplier))
+		optimizer_global.step()
+		optimizer_local.step()
+		optimizer_fusion.step()
+		
+		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch, exp_cfg['NUM_EPOCH'] - 1, loss.data.item()))
 		progressbar.update(1)
 
-		if count % batch_multiplier == 0:
-			writer.add_scalar('train/' + branch_name + ' loss', mini_batch_loss, epoch * len(data_loader) + i)
-			mini_batch_loss = 0.
+		# if count % batch_multiplier == 0:
+		# 	writer.add_scalar('train/' + branch_name + ' loss', mini_batch_loss, epoch * len(data_loader) + i)
+		# 	mini_batch_loss = 0.
+
+		running_loss += loss.data.item()
 
 	progressbar.close()
 
-	lr_scheduler.step()
+	lr_scheduler_global.step()
+	lr_scheduler_local.step() 
+	lr_scheduler_fusion.step() 
 
-	epoch_train_loss = float(running_loss) / float(count)
+	epoch_train_loss = float(running_loss) / float(i)
 	print(' Epoch over Loss: {:.5f}'.format(epoch_train_loss))
 
-	save_model(epoch, epoch_train_loss, model, optimizer, lr_scheduler, branch_name)
+	# save_model(epoch, epoch_train_loss, model, optimizer, lr_scheduler, branch_name)
 	print()
 
-	del image, target, loss, epoch_train_loss, output, heatmap, pool, model
-	torch.cuda.empty_cache()
+	# del image, target, loss, epoch_train_loss, output, heatmap, pool, model
+	# torch.cuda.empty_cache()
 
-def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model):
+def val(epoch, data_loader):
 
-	print(" Validating {} model".format(branch_name, epoch,))
+	GlobalModel.eval()
+	LocalModel.eval()
+	FusionModel.eval()
 
-	model.eval()
-	
-	gt = torch.FloatTensor().cuda()
-	pred = torch.FloatTensor().cuda()
+	ground_truth = torch.FloatTensor().cuda()
+	pred_global = torch.FloatTensor().cuda()
+	pred_local = torch.FloatTensor().cuda()
+	pred_fusion = torch.FloatTensor().cuda()
 
-	count = 0
 	running_loss = 0.
 	progressbar = tqdm(range(len(data_loader)))
 
 	with torch.no_grad():
 		for i, (image, target) in enumerate(data_loader):
 
-			if branch_name == 'local':
-				output, heatmap, pool = test_model(image.cuda())
-				image = Attention_gen_patchs(image, heatmap.cpu())
+			image_cuda = image.to(device)
+			target_cuda = target.to(device)
+			ground_truth = torch.cat((ground_truth, target), 0)
 
-				del output, heatmap, pool
+			# compute output
+			output_global, fm_global, pool_global = GlobalModel(image_cuda)
+			
+			image_patch = AttentionGenPatchs(image_cuda.cpu(), fm_global).to(device)
 
-			if branch_name == 'fusion':
-				output, heatmap, pool1 = test_model[0](image.cuda())
-				inputs = Attention_gen_patchs(image, heatmap.cpu())
-				output, heatmap, pool2 = test_model[1](inputs.cuda())
-				pool1 = pool1.view(pool1.size(0), -1)
-				pool2 = pool2.view(pool2.size(0), -1)
-				image = torch.cat((pool1.cpu(), pool2.cpu()), dim=1)
+			output_local, _, pool_local = LocalModel(image_patch)
 
-				del output, heatmap, pool1, pool2, inputs
+			output_fusion = FusionModel(pool_global, pool_local)
 
-			image = image.cuda()
-			target = target.cuda()
-			gt = torch.cat((gt, target), 0)
+			# loss
+			loss_global = criterion(output_global, target_cuda)
+			loss_local = criterion(output_local, target_cuda)
+			loss_fusion = criterion(output_fusion, target_cuda)
 
-			output, heatmap, pool = model(image)
-			pred = torch.cat((pred, output.data), 0)
+			loss = loss_global + loss_local + loss_fusion
 
-			loss = loss_func(output, target)
+			
+			pred_global = torch.cat((pred_global, output_global.data), 0)
+			pred_local = torch.cat((pred_local, output_local.data), 0)
+			pred_fusion = torch.cat((pred_fusion, output_fusion.data), 0)
 
 			running_loss += loss.data.item()
-			count += 1
 
 			progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch,  exp_cfg['NUM_EPOCH'] - 1, loss.data.item()))
 			progressbar.update(1)
-			writer.add_scalar('val/' + branch_name + ' loss', loss.data.item(), epoch * len(data_loader) + i)
+			# writer.add_scalar('val/' + branch_name + ' loss', loss.data.item(), epoch * len(data_loader) + i)
 
 		progressbar.close()
 		
-		epoch_val_loss = float(running_loss) / float(count)
+		epoch_val_loss = float(running_loss) / float(i)
 		print(' Epoch over Loss: {:.5f}'.format(epoch_val_loss))
 
 		if args.use == 'train':
@@ -337,20 +322,9 @@ def val(epoch, branch_name, model, data_loader, optimizer, loss_func, test_model
 		print()
 
 def main():
-	global GlobalModel, LocalModel, FusionModel
 
 	for branch_name in BRANCH_NAME_LIST:
-		print(" Start training " + branch_name + " branch...")
-		batch_multiplier = exp_cfg['batch_size'][branch_name] // MAX_BATCH_CAPACITY[branch_name]
-
-		train_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = TRAIN_IMAGE_LIST, transform = transform)
-		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 4)
-
-		val_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = VAL_IMAGE_LIST, transform = transform)
-		val_loader = DataLoader(dataset = val_dataset, batch_size = exp_cfg['batch_size'][branch_name]//2, shuffle = False, num_workers = 4)
-
-		test_dataset = ChestXrayDataSet(data_dir = IMAGES_DATA_PATH, image_list_file = TEST_IMAGE_LIST, transform = transform)
-		test_loader = DataLoader(dataset = test_dataset, batch_size = exp_cfg['batch_size'][branch_name]//2, shuffle = False, num_workers = 4)
+		print(" Start training branch...")
 
 		if args.resume:
 
@@ -399,64 +373,10 @@ def main():
 			max_epoch = 1
 
 		for epoch in range(start_epoch, max_epoch):
+			train(epoch)
+			val(epoch, val_loader)
 
-			if branch_name == 'global':
-				GlobalModel = GlobalModel.to(device)
-
-				if args.use == 'train':
-					train(epoch, branch_name, GlobalModel, train_loader, optimizer_global, lr_scheduler_global, loss_global, None, batch_multiplier)
-					val_test_loader = val_loader
-				elif args.use == 'test':
-					save_dict_global = torch.load(os.path.join(exp_dir, exp_dir.split('/')[-1] + '_global_best' + '.pth'))
-					GlobalModel.load_state_dict(save_dict_global['net'])
-					val_test_loader = test_loader
-
-				val(epoch, branch_name, GlobalModel, val_test_loader, optimizer_global, loss_global, None)
-
-			if branch_name == 'local':
-
-				save_dict_global = torch.load(os.path.join(exp_dir, exp_dir.split('/')[-1] + '_global_best' + '.pth'))
-	
-				GlobalModelTest = Net(exp_cfg['backbone']).to(device)
-				GlobalModelTest.load_state_dict(save_dict_global['net'])
-
-				LocalModel = LocalModel.to(device)
-
-				if args.use == 'train':
-					train(epoch, branch_name, LocalModel, train_loader, optimizer_local, lr_scheduler_local, loss_local, GlobalModelTest, batch_multiplier)
-					val_test_loader = val_loader
-				elif args.use == 'test':
-					save_dict_local = torch.load(os.path.join(exp_dir, exp_dir.split('/')[-1] + '_local_best' + '.pth'))
-					LocalModel.load_state_dict(save_dict_local['net'])
-					val_test_loader = test_loader
-
-				val(epoch, branch_name, LocalModel, val_test_loader, optimizer_local, loss_local, GlobalModelTest)
-			
-			if branch_name == 'fusion':
-
-				save_dict_global = torch.load(os.path.join(exp_dir, exp_dir.split('/')[-1] + '_global_best' + '.pth'))
-				save_dict_local = torch.load(os.path.join(exp_dir, exp_dir.split('/')[-1] + '_local_best' + '.pth'))
-
-				GlobalModelTest = Net(exp_cfg['backbone']).to(device)
-				LocalModelTest = Net(exp_cfg['backbone']).to(device)
-
-				GlobalModelTest.load_state_dict(save_dict_global['net'])
-				LocalModelTest.load_state_dict(save_dict_local['net'])
-
-				FusionModel = FusionModel.to(device)
-
-				if args.use == 'train':
-					train(epoch, branch_name, FusionModel, train_loader, optimizer_fusion, lr_scheduler_fusion, loss_fusion, (GlobalModelTest, LocalModelTest), batch_multiplier)
-					val_test_loader = val_loader
-
-				elif args.use == 'test':
-					save_dict_fusion = torch.load(os.path.join(exp_dir, exp_dir.split('/')[-1] + '_fusion_best' + '.pth'))
-					LocalModel.load_state_dict(save_dict_local['net'])
-					val_test_loader = test_loader
-
-				val(epoch, branch_name, FusionModel, val_test_loader, optimizer_fusion, loss_fusion, (GlobalModelTest, LocalModelTest))
-
-		print(" Training " + branch_name + " branch done.")
+		print(" Training branch done.")
 
 if __name__ == "__main__":
 	main()
