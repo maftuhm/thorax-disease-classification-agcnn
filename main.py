@@ -66,7 +66,7 @@ transform_test = transforms.Compose([
 CLASS_NAMES = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass', 'Nodule', 'Pneumonia',
 				'Pneumothorax', 'Consolidation', 'Edema', 'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia']
 
-DATASET_PATH = path.join('D:/', 'Data', 'data')
+DATASET_PATH = path.join('..', 'lung-disease-detection', 'data')
 IMAGES_DATA_PATH = path.join(DATASET_PATH, 'images')
 TRAIN_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'train_list.txt')
 VAL_IMAGE_LIST = path.join(DATASET_PATH, 'labels', 'val_list.txt')
@@ -247,10 +247,10 @@ def val(epoch, data_loader):
 	LocalModel.eval()
 	FusionModel.eval()
 
-	ground_truth = torch.FloatTensor().cuda()
-	pred_global = torch.FloatTensor().cuda()
-	pred_local = torch.FloatTensor().cuda()
-	pred_fusion = torch.FloatTensor().cuda()
+	ground_truth = torch.FloatTensor()
+	pred_global = torch.FloatTensor()
+	pred_local = torch.FloatTensor()
+	pred_fusion = torch.FloatTensor()
 
 	running_loss = 0.
 	progressbar = tqdm(range(len(data_loader)))
@@ -323,60 +323,59 @@ def val(epoch, data_loader):
 
 def main():
 
-	for branch_name in BRANCH_NAME_LIST:
-		print(" Start training branch...")
+	print(" Start training branch...")
 
-		if args.resume:
+	if args.resume:
 
-			CKPT_PATH = path.join(exp_dir, exp_dir.split('/')[-1] + '_'+ branch_name + '.pth')
-			file_found = False
+		CKPT_PATH = path.join(exp_dir, exp_dir.split('/')[-1] + '_'+ branch_name + '.pth')
+		file_found = False
 
-			if path.isfile(CKPT_PATH):
-				save_dict = torch.load(CKPT_PATH)
-				file_found = True
+		if path.isfile(CKPT_PATH):
+			save_dict = torch.load(CKPT_PATH)
+			file_found = True
 
-			if branch_name == 'global':
-				GlobalModel = GlobalModel.to(device)
-
-				if file_found:
-					GlobalModel.load_state_dict(save_dict['net'])
-					optimizer_global.load_state_dict(save_dict['optim'])
-					lr_scheduler_global.load_state_dict(save_dict['lr_scheduler'])
-
-			if branch_name == 'local':
-				LocalModel = LocalModel.to(device)
-
-				if file_found:
-					LocalModel.load_state_dict(save_dict['net'])
-					optimizer_local.load_state_dict(save_dict['optim'])
-					lr_scheduler_local.load_state_dict(save_dict['lr_scheduler'])
-
-			if branch_name == 'fusion':
-				FusionModel = FusionModel.to(device)
-
-				if file_found:
-					FusionModel.load_state_dict(save_dict['net'])
-					optimizer_fusion.load_state_dict(save_dict['optim'])
-					lr_scheduler_fusion.load_state_dict(save_dict['lr_scheduler'])
+		if branch_name == 'global':
+			GlobalModel = GlobalModel.to(device)
 
 			if file_found:
-				BEST_VAL_LOSS[branch_name] = save_dict['loss_value']
-				start_epoch = save_dict['epoch'] + 1
-			else:
-				start_epoch = 0	
+				GlobalModel.load_state_dict(save_dict['net'])
+				optimizer_global.load_state_dict(save_dict['optim'])
+				lr_scheduler_global.load_state_dict(save_dict['lr_scheduler'])
+
+		if branch_name == 'local':
+			LocalModel = LocalModel.to(device)
+
+			if file_found:
+				LocalModel.load_state_dict(save_dict['net'])
+				optimizer_local.load_state_dict(save_dict['optim'])
+				lr_scheduler_local.load_state_dict(save_dict['lr_scheduler'])
+
+		if branch_name == 'fusion':
+			FusionModel = FusionModel.to(device)
+
+			if file_found:
+				FusionModel.load_state_dict(save_dict['net'])
+				optimizer_fusion.load_state_dict(save_dict['optim'])
+				lr_scheduler_fusion.load_state_dict(save_dict['lr_scheduler'])
+
+		if file_found:
+			BEST_VAL_LOSS[branch_name] = save_dict['loss_value']
+			start_epoch = save_dict['epoch'] + 1
 		else:
-			start_epoch = 0
+			start_epoch = 0	
+	else:
+		start_epoch = 0
 
-		if args.use == 'train':
-			max_epoch = exp_cfg['NUM_EPOCH']
-		elif args.use == 'test':
-			max_epoch = 1
+	if args.use == 'train':
+		max_epoch = exp_cfg['NUM_EPOCH']
+	elif args.use == 'test':
+		max_epoch = 1
 
-		for epoch in range(start_epoch, max_epoch):
-			train(epoch)
-			val(epoch, val_loader)
+	for epoch in range(start_epoch, max_epoch):
+		train(epoch)
+		val(epoch, val_loader)
 
-		print(" Training branch done.")
+	print(" Training branch done.")
 
-if __name__ == "__main__":
-	main()
+# if __name__ == "__main__":
+	# main()
