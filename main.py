@@ -20,7 +20,7 @@ from utils import *
 def parse_args():
 	parser = argparse.ArgumentParser(description='AG-CNN')
 	parser.add_argument('--use', type=str, default='train', help='use for what (train or test)')
-	parser.add_argument("--exp_dir", type=str, default="./experiments/exp6")
+	parser.add_argument("--exp_dir", type=str, default="./experiments/exp7")
 	parser.add_argument("--resume", "-r", action="store_true")
 	args = parser.parse_args()
 	return args
@@ -75,15 +75,15 @@ def main():
 	train_loader = DataLoader(dataset = train_dataset, batch_size = max_batch_capacity, shuffle = True, num_workers = 4)
 
 	val_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'val', transform = transform_test)
-	val_loader = DataLoader(dataset = val_dataset, batch_size = 64, shuffle = False, num_workers = 4)
+	val_loader = DataLoader(dataset = val_dataset, batch_size = 32, shuffle = False, num_workers = 4)
 
 	test_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'test', transform = transform_test)
-	test_loader = DataLoader(dataset = test_dataset, batch_size = 64, shuffle = False, num_workers = 4)
+	test_loader = DataLoader(dataset = test_dataset, batch_size = 32, shuffle = False, num_workers = 4)
 
 	# ================= MODELS ================= #
-	GlobalModel = Net(exp_cfg['backbone'])
-	LocalModel = Net(exp_cfg['backbone'])
-	FusionModel = FusionNet(exp_cfg['backbone'])
+	GlobalModel = Net(exp_cfg['backbone']).to(device)
+	LocalModel = Net(exp_cfg['backbone']).to(device)
+	FusionModel = FusionNet(exp_cfg['backbone']).to(device)
 
 	# ================= OPTIMIZER ================= #
 	optimizer_global = optim.SGD(GlobalModel.parameters(), **exp_cfg['optimizer']['SGD'])
@@ -110,7 +110,7 @@ def main():
 			GlobalModel.load_state_dict(save_dict['net'])
 			optimizer_global.load_state_dict(save_dict['optim'])
 			lr_scheduler_global.load_state_dict(save_dict['lr_scheduler'])
-			print("Loaded Global Branch Model checkpoint")
+			print(" Loaded Global Branch Model checkpoint")
 
 		if path.isfile(checkpoint_local):
 			save_dict = torch.load(checkpoint_local)
@@ -118,7 +118,7 @@ def main():
 			LocalModel.load_state_dict(save_dict['net'])
 			optimizer_local.load_state_dict(save_dict['optim'])
 			lr_scheduler_local.load_state_dict(save_dict['lr_scheduler'])
-			print("Loaded Local Branch Model checkpoint")
+			print(" Loaded Local Branch Model checkpoint")
 
 		if path.isfile(checkpoint_fusion):
 			save_dict = torch.load(checkpoint_fusion)
@@ -126,16 +126,12 @@ def main():
 			FusionModel.load_state_dict(save_dict['net'])
 			optimizer_fusion.load_state_dict(save_dict['optim'])
 			lr_scheduler_fusion.load_state_dict(save_dict['lr_scheduler'])
-			print("Loaded Fusion Model checkpoint")
+			print(" Loaded Fusion Branch Model checkpoint")
 
 		start_epoch += 1
 
 	else:
 		start_epoch = 0
-
-	GlobalModel = GlobalModel.to(device)
-	LocalModel = LocalModel.to(device)
-	FusionModel = FusionModel.to(device)
 
 	for epoch in range(start_epoch, exp_cfg['NUM_EPOCH']):
 		print(' Epoch [{}/{}]'.format(epoch , exp_cfg['NUM_EPOCH'] - 1))
@@ -182,7 +178,7 @@ def main():
 			loss_local = criterion(output_local, target_cuda)
 			loss_fusion = criterion(output_fusion, target_cuda)
 
-			loss = (loss_global + loss_local + loss_fusion) / batch_multiplier
+			loss = (0.8 * loss_global + 0.1 *loss_local + 0.1 * loss_fusion) / batch_multiplier
 			loss.backward()
 			count -= 1
 			
@@ -195,7 +191,7 @@ def main():
 																	loss3 = loss_fusion))
 			progressbar.update(1)
 
-			running_loss += loss.data.item()
+			running_loss += loss.data.item() * batch_multiplier
 
 		progressbar.close()
 
@@ -222,7 +218,7 @@ def main():
 
 		epoch_train_loss = float(running_loss) / float(i)
 		print(' Epoch over Loss: {:.5f}'.format(epoch_train_loss))
-		test(GlobalModel, LocalModel, FusionModel, test_loader)
+		test(GlobalModel, LocalModel, FusionModel, val_loader)
 
 def test(GlobalModel, LocalModel, FusionModel, test_loader):
 

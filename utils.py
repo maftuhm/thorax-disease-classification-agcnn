@@ -21,12 +21,14 @@ def AttentionGenPatchs(ori_image, fm_cuda, size_crop = (224, 224)):
 	for i in range(bz):
 		feature = np.abs(feature_conv[i])
 		heatmap = np.max(feature, axis = 0)
-		heatmap = (heatmap - np.min(heatmap)) / np.max(heatmap)
+		# heatmap = (heatmap - np.min(heatmap)) / np.max(heatmap)
 		heatmap = np.uint8(255 * heatmap)
 
-		resized_heatmap = cv2.resize(heatmap, size_crop)
-		_, heatmap_bin = cv2.threshold(resized_heatmap , 0 , 255 , cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-		# _, heatmap_bin = cv2.threshold(resized_heatmap , int(255 * 0.7) , 255 , cv2.THRESH_BINARY)
+		heatmap = cv2.resize(heatmap, size_crop)
+		# heatmap[heatmap > 0.7] = 1
+		# heatmap[heatmap != 1] = 0
+		# _, heatmap_bin = cv2.threshold(resized_heatmap , 0 , 255 , cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+		_, heatmap_bin = cv2.threshold(heatmap , int(255 * 0.7) , 255 , cv2.THRESH_BINARY)
 		heatmap_maxconn = selectMaxConnect(heatmap_bin)
 		heatmap_mask = heatmap_bin * heatmap_maxconn
 
