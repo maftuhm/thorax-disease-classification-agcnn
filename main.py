@@ -153,9 +153,6 @@ def main():
 
 		for i, (image, target) in enumerate(train_loader):
 
-			image_cuda = image.to(device)
-			target_cuda = target.to(device)
-
 			if count == 0:
 				optimizer_global.step()
 				optimizer_local.step()
@@ -168,20 +165,20 @@ def main():
 				count = batch_multiplier
 
 			# compute output
-			output_global, fm_global, pool_global = GlobalModel(image_cuda)
+			output_global, fm_global, pool_global = GlobalModel(image.to(device))
 			
-			image_patch, coordinates = AttentionGenPatchs(image_cuda.cpu(), fm_global).to(device)
+			image_patch, coordinates = AttentionGenPatchs(image.detach(), fm_global.detach().cpu())
 
-			output_local, _, pool_local = LocalModel(image_patch)
+			output_local, _, pool_local = LocalModel(image_patch.to(device))
 
 			output_fusion = FusionModel(pool_global, pool_local)
 
 			# loss
-			loss_global = criterion(output_global, target_cuda)
-			loss_local = criterion(output_local, target_cuda)
-			loss_fusion = criterion(output_fusion, target_cuda)
+			global_loss = criterion(output_global, target.to(device))
+			local_loss = criterion(output_local, target.to(device))
+			fusion_loss = criterion(output_fusion, target.to(device))
 
-			loss = (0.8 * loss_global + 0.1 *loss_local + 0.1 * loss_fusion) / batch_multiplier
+			loss = (0.8 * global_loss + 0.1 * local_loss + 0.1 * fusion_loss) / batch_multiplier
 			loss.backward()
 			count -= 1
 			
@@ -189,9 +186,9 @@ def main():
 										"loss1: {loss1:.3f} "
 										"loss2: {loss2:.3f} "
 										"loss3: {loss3:.3f}".format(loss = loss * batch_multiplier,
-																	loss1 = loss_global,
-																	loss2 = loss_local,
-																	loss3 = loss_fusion))
+																	loss1 = global_loss.data.item(),
+																	loss2 = local_loss.data.item(),
+																	loss3 = fusion_loss.data.item()))
 
 			if (i + 1) % 500 == 0:
 				target_embedding = []
@@ -204,15 +201,15 @@ def main():
 
 					target_embedding.append(text_label)
 
-				draw_image = drawImage(image, target_embedding, image_patch.detach().cpu(), coordinates)
+				draw_image = drawImage(image, target_embedding, image_patch.detach(), coordinates)
 				writer.add_images("Train/img_{}".format(i), draw_image, epoch)
 
 			progressbar.update(1)
 
 			running_loss += loss.data.item() * batch_multiplier
-			running_global_loss += loss_global.data.item()
-			running_local_loss += loss_local.data.item()
-			running_fusion_loss += loss_fusion.data.item()
+			running_global_loss += global_loss.data.item()
+			running_local_loss += local_loss.data.item()
+			running_fusion_loss += fusion_loss.data.item()
 
 		progressbar.close()
 
@@ -253,32 +250,29 @@ def test(GlobalModel, LocalModel, FusionModel, test_loader):
 	LocalModel.eval()
 	FusionModel.eval()
 
-	ground_truth = torch.FloatTensor().to(device)
-	pred_global = torch.FloatTensor().to(device)
-	pred_local = torch.FloatTensor().to(device)
-	pred_fusion = torch.FloatTensor().to(device)
+	ground_truth = torch.FloatTensor()
+	pred_global = torch.FloatTensor()
+	pred_local = torch.FloatTensor()
+	pred_fusion = torch.FloatTensor()
 
 	progressbar = tqdm(range(len(test_loader)))
 
 	with torch.no_grad():
 		for i, (image, target) in enumerate(test_loader):
 
-			image_cuda = image.to(device)
-			target_cuda = target.to(device)
-			ground_truth = torch.cat((ground_truth, target_cuda), 0)
-
 			# compute output
-			output_global, fm_global, pool_global = GlobalModel(image_cuda)
+			output_global, fm_global, pool_global = GlobalModel(image.to(device))
 			
-			image_patch = AttentionGenPatchs(image_cuda.cpu(), fm_global).to(device)
+			image_patch, coordinates = AttentionGenPatchs(image.detach(), fm_global.detach().cpu())
 
-			output_local, _, pool_local = LocalModel(image_patch)
+			output_local, _, pool_local = LocalModel(image_patch.to(device))
 
 			output_fusion = FusionModel(pool_global, pool_local)
-			
-			pred_global = torch.cat((pred_global, output_global.data), 0)
-			pred_local = torch.cat((pred_local, output_local.data), 0)
-			pred_fusion = torch.cat((pred_fusion, output_fusion.data), 0)
+
+			ground_truth = torch.cat((ground_truth, target.detach()), 0)
+			pred_global = torch.cat((pred_global, output_global.data.item()), 0)
+			pred_local = torch.cat((pred_local, output_local.data.item()), 0)
+			pred_fusion = torch.cat((pred_fusion, output_fusion.data.item()), 0)
 
 			progressbar.update(1)
 
