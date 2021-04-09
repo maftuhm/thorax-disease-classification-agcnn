@@ -106,9 +106,9 @@ class AttentionGuidedNet(nn.Module):
 		for b in range(batch_size):
 			heatmap = torch.abs(features_global[b])
 			heatmap = torch.max(heatmap, dim = 0)[0]
-			# max1 = torch.max(heatmap)
-			# min1 = torch.min(heatmap)
-			# heatmap = (heatmap - min1) / (max1 - min1)
+			max1 = torch.max(heatmap)
+			min1 = torch.min(heatmap)
+			heatmap = (heatmap - min1) / (max1 - min1)
 
 			heatmap = F.interpolate(heatmap.unsqueeze(0).unsqueeze(0), size=(h, w), mode = 'bilinear', align_corners = True)
 			heatmap = torch.squeeze(heatmap)

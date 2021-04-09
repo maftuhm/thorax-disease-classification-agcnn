@@ -91,17 +91,17 @@ def main():
 
 	if args.resume:
 		start_epoch = 0
-		# checkpoint_global = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global.pth')
+		checkpoint = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_model.pth')
 		# checkpoint_local = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_local.pth')
 		# checkpoint_fusion = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_fusion.pth')
 
-		# if path.isfile(checkpoint_global):
-		# 	save_dict = torch.load(checkpoint_global)
-		# 	start_epoch = max(save_dict['epoch'], start_epoch)
-		# 	GlobalModel.load_state_dict(save_dict['net'])
-		# 	optimizer_global.load_state_dict(save_dict['optim'])
-		# 	lr_scheduler_global.load_state_dict(save_dict['lr_scheduler'])
-		# 	print(" Loaded Global Branch Model checkpoint")
+		if path.isfile(checkpoint):
+			save_dict = torch.load(checkpoint)
+			start_epoch = save_dict['epoch']
+			Model.load_state_dict(save_dict['net'])
+			optimizer.load_state_dict(save_dict['optim'])
+			lr_scheduler.load_state_dict(save_dict['lr_scheduler'])
+			print(" Loaded model checkpoint")
 
 		# if path.isfile(checkpoint_local):
 		# 	save_dict = torch.load(checkpoint_local)
@@ -119,7 +119,7 @@ def main():
 		# 	lr_scheduler_fusion.load_state_dict(save_dict['lr_scheduler'])
 		# 	print(" Loaded Fusion Branch Model checkpoint")
 
-		# start_epoch += 1
+		start_epoch += 1
 
 	else:
 		start_epoch = 0
@@ -222,9 +222,9 @@ def main():
 											'fusion_loss': running_fusion_loss / float(i)}, epoch)
 		writer.flush()
 
-		test(Model, val_loader)
+		test(epoch, Model, val_loader)
 
-def test(Model, test_loader):
+def test(epoch, Model, test_loader):
 
 	Model.eval()
 
@@ -244,18 +244,24 @@ def test(Model, test_loader):
 
 			# compute output
 			output = Model(image_cuda, target_cuda)
-						# loss
-			output['global']
-			output['local']
-			output['fusion']
 
 			pred_global = torch.cat((pred_global, output['global'].data), 0)
 			pred_local = torch.cat((pred_local, output['local'].data), 0)
 			pred_fusion = torch.cat((pred_fusion, output['fusion'].data), 0)
 
-			if i % 500 == 0:
-				draw_image = drawImage(image, str(target), output['image_patch'].cpu(), output['coordinates'])
-				writer.add_images("Val/img_{}".format(i), draw_image, epoch)
+			if (i + 1) % 150 == 0:
+				target_embedding = []
+				for label in target:
+					text_label = [classes_name[i] for i, a in enumerate(label) if a != 0]
+					text_label = '|'.join(text_label)
+
+					if len(text_label) == 0:
+					    text_label = 'No Finding'
+					
+					target_embedding.append(text_label)
+
+				draw_image = drawImage(image, target_embedding, output['image_patch'].detach().cpu(), output['coordinates'])
+				writer.add_images("Train/img_{}".format(i), draw_image, epoch)
 
 			progressbar.update(1)
 
