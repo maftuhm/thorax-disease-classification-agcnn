@@ -2,7 +2,7 @@ import os
 import cv2
 import shutil
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from sklearn.metrics import roc_auc_score
 from skimage.measure import label
@@ -90,3 +90,22 @@ def compute_AUCs(gt, pred):
 	for i in range(14):
 		AUROCs.append(roc_auc_score(gt_np[:, i], pred_np[:, i]))
 	return AUROCs
+
+def drawImage(images, labels, images_cropped, coordinates):
+	bz, c, h, w = images.shape # batch_size, channel, height, width
+
+	new_images = Image.new('RGB', (bz * w, 2 * h), (0, 0, 0))
+
+	for i in range(size[0]):
+
+		img = transforms.ToPILImage()(images[i])
+		img_patch = transforms.ToPILImage()(images_cropped[i])
+
+		draw_img = ImageDraw.Draw(img)
+		draw_img.rectangle(coordinates, outline=(0, 255, 0))
+		draw_img.text((coordinates[0], coordinates[1] - 10), labels[i], (0, 255, 0))
+
+		new_image.paste(img, (i * w, 0))
+		new_image.paste(img_patch, (i * w, w))
+
+	return new_images

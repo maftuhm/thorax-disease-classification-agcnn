@@ -65,7 +65,7 @@ class AttentionGuidedNet(nn.Module):
 
 	def forward(self, img, target = None):
 		output_global, fm_global, pool_global = self.global_net(img)
-		image_patch = self.attention_gen_patchs(img, fm_global)
+		image_patch, coordinates = self.attention_gen_patchs(img, fm_global)
 		output_local, _, pool_local = self.local_net(image_patch)
 		output_fusion = self.fusion_net(pool_global, pool_local)
 
@@ -78,10 +78,11 @@ class AttentionGuidedNet(nn.Module):
 			local_loss = torch.tensor(0, dtype=img.dtype, device=img.device)
 			fusion_loss = torch.tensor(0, dtype=img.dtype, device=img.device)
 
-		loss = 0.8 * global_loss + 0.1 *local_loss + 0.1 * fusion_loss
+		loss = 0.8 * global_loss + 0.1 * local_loss + 0.1 * fusion_loss
 
 		output = {
 			"image_patch": image_patch,
+			"coordinates": coordinates,
 			"global": output_global,
 			"local": output_local,
 			"fusion": output_fusion,
@@ -127,7 +128,7 @@ class AttentionGuidedNet(nn.Module):
 			heatmap = transforms.Resize((h, w))(image)
 			cropped_image[b] = transforms.ToTensor()(heatmap)
 
-		return cropped_image.to(ori_image.dtype)
+		return cropped_image.to(ori_image.dtype), (xmin, xmax, ymin, ymax)
 
 	def _select_max_connect(self, heatmap):
 		labeled_img, num = measure.label(heatmap, connectivity = 2, background = 0, return_num = True)    
