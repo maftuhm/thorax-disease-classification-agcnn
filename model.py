@@ -106,13 +106,11 @@ class AttentionGuidedNet(nn.Module):
 		for b in range(batch_size):
 			heatmap = torch.abs(features_global[b])
 			heatmap = torch.max(heatmap, dim = 0)[0]
-			max1 = torch.max(heatmap)
-			min1 = torch.min(heatmap)
-			heatmap = (heatmap - min1) / (max1 - min1)
+			# max1 = torch.max(heatmap)
+			# min1 = torch.min(heatmap)
+			# heatmap = (heatmap - min1) / (max1 - min1)
 
-			heatmap = transforms.ToPILImage()(heatmap)
-			heatmap = transforms.Resize((h, w))(heatmap)
-			heatmap = transforms.ToTensor()(heatmap).squeeze(0)
+			heatmap = transforms.Resize((h, w))(heatmap).squeeze(0)
 
 			heatmap[heatmap > threshold] = 1
 			heatmap[heatmap != 1] = 0
@@ -125,11 +123,7 @@ class AttentionGuidedNet(nn.Module):
 			ymin = int(torch.min(where, dim = 0)[0][1])
 			ymax = int(torch.max(where, dim = 0)[0][1])
 
-			image = transforms.ToPILImage()(ori_image[b].cpu())
-
-			heatmap = image.crop((xmin, ymin, xmax, ymax))
-			heatmap = heatmap.resize((h, w))
-			cropped_image[b] = transforms.ToTensor()(heatmap)
+			heatmap = transforms.Resize((h, w))(ori_image[b][:, xmin:xmax, ymin:ymax])
 			coordinates.append((xmin, ymin, xmax, ymax))
 
 		return cropped_image.to(ori_image.dtype), coordinates

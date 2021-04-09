@@ -179,7 +179,17 @@ def main():
 			running_fusion_loss += fusion_loss
 
 			if (i + 1) % 500 == 0:
-				draw_image = drawImage(image, target, output['image_patch'].detach().cpu(), output['coordinates'])
+				target_embedding = []
+				for label in target:
+					text_label = [CLASS_NAMES[i] for i, a in enumerate(label) if a != 0]
+					text_label = '|'.join(text_label)
+
+					if len(text_label) == 0:
+					    text_label = 'No Finding'
+					
+					target_embedding.append(text_label)
+
+				draw_image = drawImage(image, target_embedding, output['image_patch'].detach().cpu(), output['coordinates'])
 				writer.add_images("Train/img_{}".format(i), draw_image, epoch)
 
 		progressbar.close()
