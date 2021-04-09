@@ -96,7 +96,7 @@ class AttentionGuidedNet(nn.Module):
 
 	def attention_gen_patchs(self, ori_image, features_global, threshold = 0.7):
 
-		features_global = features_global.cpu()
+		features_global = features_global.detach().cpu()
 		batch_size = features_global.shape[0]
 		n, c, h, w = ori_image.shape
 
@@ -110,8 +110,8 @@ class AttentionGuidedNet(nn.Module):
 			# min1 = torch.min(heatmap)
 			# heatmap = (heatmap - min1) / (max1 - min1)
 
-			heatmap = transforms.Resize((h, w))(heatmap).squeeze(0)
-
+			heatmap = F.interpolate(heatmap.unsqueeze(0).unsqueeze(0), size=(h, w), mode = 'bilinear', align_corners = True)
+			heatmap = torch.squeeze(heatmap)
 			heatmap[heatmap > threshold] = 1
 			heatmap[heatmap != 1] = 0
 
@@ -123,7 +123,8 @@ class AttentionGuidedNet(nn.Module):
 			ymin = int(torch.min(where, dim = 0)[0][1])
 			ymax = int(torch.max(where, dim = 0)[0][1])
 
-			heatmap = transforms.Resize((h, w))(ori_image[b][:, xmin:xmax, ymin:ymax])
+			img_crop = ori_image[b][:, xmin:xmax, ymin:ymax]
+			cropped_image[b] = F.interpolate(img_crop.unsqueeze(0), size=(h, w), mode = 'bilinear', align_corners = True).squeeze(0)
 			coordinates.append((xmin, ymin, xmax, ymax))
 
 		return cropped_image.to(ori_image.dtype), coordinates

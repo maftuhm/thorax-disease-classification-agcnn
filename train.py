@@ -181,7 +181,7 @@ def main():
 			if (i + 1) % 500 == 0:
 				target_embedding = []
 				for label in target:
-					text_label = [CLASS_NAMES[i] for i, a in enumerate(label) if a != 0]
+					text_label = [classes_name[i] for i, a in enumerate(label) if a != 0]
 					text_label = '|'.join(text_label)
 
 					if len(text_label) == 0:

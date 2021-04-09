@@ -127,7 +127,7 @@ def drawImage(images, labels, images_cropped, coordinates):
 
 		draw_img = ImageDraw.Draw(img)
 		draw_img.rectangle(coordinates[i], outline=(0, 255, 0))
-		draw_img.text((coordinates[i][0], coordinates[i][1] - 10), str(labels[i]), (0, 255, 0))
+		draw_img.text((coordinates[i][0] + 5, coordinates[i][1] + 5), str(labels[i]), (0, 255, 0))
 
 		new_images.paste(img, (i * w, 0))
 		new_images.paste(img_patch, (i * w, w))
