@@ -2,49 +2,50 @@ import os
 import cv2
 import shutil
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from sklearn.metrics import roc_auc_score
 from skimage.measure import label
 
 import torch
+import torch.nn.funtional as F
 import torchvision.transforms as transforms
 
-def AttentionGenPatchs(ori_image, fm_cuda, size_crop = (224, 224)):
+def AttentionGenPatchs(ori_image, features_global, threshold = 0.7):
 
-	feature_conv = fm_cuda.data.cpu().numpy()
+	features_global = features_global.detach().cpu()
+	batch_size = features_global.shape[0]
+	n, c, h, w = ori_image.shape
 
-	bz, nc, h, w = feature_conv.shape
+	cropped_image = torch.zeros(batch_size, c, w, h, dtype=ori_image.dtype)
+	coordinates = []
 
-	images = torch.randn(bz, 3, size_crop[0], size_crop[1])
+	for b in range(batch_size):
+		heatmap = torch.abs(features_global[b])
+		heatmap = torch.max(heatmap, dim = 0)[0]
+		max1 = torch.max(heatmap)
+		min1 = torch.min(heatmap)
+		heatmap = (heatmap - min1) / (max1 - min1)
 
-	for i in range(bz):
-		feature = np.abs(feature_conv[i])
-		heatmap = np.max(feature, axis = 0)
-		# heatmap = (heatmap - np.min(heatmap)) / np.max(heatmap)
-		heatmap = np.uint8(255 * heatmap)
+		heatmap = F.interpolate(heatmap.unsqueeze(0).unsqueeze(0), size=(h, w), mode = 'bilinear', align_corners = True)
+		heatmap = torch.squeeze(heatmap)
+		heatmap[heatmap > threshold] = 1
+		heatmap[heatmap != 1] = 0
 
-		heatmap = cv2.resize(heatmap, size_crop)
-		# heatmap[heatmap > 0.7] = 1
-		# heatmap[heatmap != 1] = 0
-		# _, heatmap_bin = cv2.threshold(resized_heatmap , 0 , 255 , cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-		_, heatmap_bin = cv2.threshold(heatmap , int(255 * 0.7) , 255 , cv2.THRESH_BINARY)
-		heatmap_maxconn = selectMaxConnect(heatmap_bin)
-		heatmap_mask = heatmap_bin * heatmap_maxconn
+		heatmap = selectMaxConnect(heatmap)
 
-		ind = np.argwhere(heatmap_mask != 0)
-		minh = min(ind[:,0])
-		minw = min(ind[:,1])
-		maxh = max(ind[:,0])
-		maxw = max(ind[:,1])
+		where = torch.from_numpy(np.argwhere(heatmap == 1))
+		xmin = int(torch.min(where, dim = 0)[0][0])
+		xmax = int(torch.max(where, dim = 0)[0][0])
+		ymin = int(torch.min(where, dim = 0)[0][1])
+		ymax = int(torch.max(where, dim = 0)[0][1])
 
-		image = ori_image[i].numpy().transpose(1, 2, 0)
-		image_crop = image[minh:maxh, minw:maxw, :]
-		image_crop = cv2.resize(image_crop, size_crop)
-		image_crop = Image.fromarray(image_crop.astype('uint8')).convert("RGB")
-		images[i] = transforms.ToTensor()(image_crop)
+		img_crop = ori_image[b][:, xmin:xmax, ymin:ymax]
+		cropped_image[b] = F.interpolate(img_crop.unsqueeze(0), size=(h, w), mode = 'bilinear', align_corners = True).squeeze(0)
+		coordinates.append((xmin, ymin, xmax, ymax))
 
-	return images
+	return cropped_image, coordinates
+
 
 def selectMaxConnect(heatmap):
 	labeled_img, num = label(heatmap, connectivity=2, background=0, return_num=True)    
@@ -90,3 +91,47 @@ def compute_AUCs(gt, pred):
 	for i in range(14):
 		AUROCs.append(roc_auc_score(gt_np[:, i], pred_np[:, i]))
 	return AUROCs
+
+class UnNormalize(object):
+	def __init__(self, mean, std):
+		self.mean = mean
+		self.std = std
+
+	def __call__(self, tensor):
+		"""
+		Args:
+			tensor (Tensor): Tensor image of size (C, H, W) to be normalized.
+		Returns:
+			Tensor: Normalized image.
+		"""
+		for t, m, s in zip(tensor, self.mean, self.std):
+			t.mul_(s).add_(m)
+			# The normalize code -> t.sub_(m).div_(s)
+		return tensor
+
+def drawImage(images, labels, images_cropped, coordinates):
+	bz, c, h, w = images.shape # batch_size, channel, height, width
+
+	new_images = Image.new('RGB', (bz * w, 2 * h), (0, 0, 0))
+	
+	unnormalize = UnNormalize(
+	   mean=[0.485, 0.456, 0.406],
+	   std=[0.229, 0.224, 0.225]
+	)
+
+	for i in range(bz):
+		img = unnormalize(images[i])
+		img = transforms.ToPILImage()(img)
+
+		img_patch = unnormalize(images_cropped[i])
+		img_patch = transforms.ToPILImage()(img_patch)
+
+		draw_img = ImageDraw.Draw(img)
+		draw_img.rectangle(coordinates[i], outline=(0, 255, 0))
+		draw_img.text((coordinates[i][0] + 5, coordinates[i][1] + 5), str(labels[i]), (0, 255, 0))
+
+		new_images.paste(img, (i * w, 0))
+		new_images.paste(img_patch, (i * w, w))
+
+	new_images = transforms.ToTensor()(new_images).unsqueeze(0)
+	return new_images

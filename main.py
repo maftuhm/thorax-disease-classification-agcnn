@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-# from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 import torch.backends.cudnn as cudnn
 
 import torchvision.transforms as transforms
@@ -46,7 +46,7 @@ best_AUCs = {
 
 cudnn.benchmark = True
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-# writer = SummaryWriter(args.exp_dir + '/log')
+writer = SummaryWriter(args.exp_dir + '/log')
 
 def main():
 	# ================= TRANSFORMS ================= #
@@ -141,6 +141,9 @@ def main():
 		FusionModel.train()
 		
 		running_loss = 0.
+		running_global_loss = 0.
+		running_local_loss = 0.
+		running_fusion_loss = 0.
 		mini_batch_loss = 0.
 
 		count = 0
@@ -167,7 +170,7 @@ def main():
 			# compute output
 			output_global, fm_global, pool_global = GlobalModel(image_cuda)
 			
-			image_patch = AttentionGenPatchs(image_cuda.cpu(), fm_global, tuple(exp_cfg['dataset']['crop'])).to(device)
+			image_patch, coordinates = AttentionGenPatchs(image_cuda.cpu(), fm_global).to(device)
 
 			output_local, _, pool_local = LocalModel(image_patch)
 
@@ -189,9 +192,27 @@ def main():
 																	loss1 = loss_global,
 																	loss2 = loss_local,
 																	loss3 = loss_fusion))
+
+			if (i + 1) % 500 == 0:
+				target_embedding = []
+				for label in target:
+					text_label = [classes_name[i] for i, a in enumerate(label) if a != 0]
+					text_label = '|'.join(text_label)
+
+					if len(text_label) == 0:
+					    text_label = 'No Finding'
+
+					target_embedding.append(text_label)
+
+				draw_image = drawImage(image, target_embedding, image_patch.detach().cpu(), coordinates)
+				writer.add_images("Train/img_{}".format(i), draw_image, epoch)
+
 			progressbar.update(1)
 
 			running_loss += loss.data.item() * batch_multiplier
+			running_global_loss += loss_global.data.item()
+			running_local_loss += loss_local.data.item()
+			running_fusion_loss += loss_fusion.data.item()
 
 		progressbar.close()
 
@@ -218,6 +239,12 @@ def main():
 
 		epoch_train_loss = float(running_loss) / float(i)
 		print(' Epoch over Loss: {:.5f}'.format(epoch_train_loss))
+		writer.add_scalar("Train/loss", epoch_train_loss, epoch)
+		writer.add_scalars("Train/losses", {'global_loss': running_global_loss / float(i),
+											'local_loss': running_local_loss / float(i),
+											'fusion_loss': running_fusion_loss / float(i)}, epoch)
+		writer.flush()
+
 		test(GlobalModel, LocalModel, FusionModel, val_loader)
 
 def test(GlobalModel, LocalModel, FusionModel, test_loader):
@@ -243,7 +270,7 @@ def test(GlobalModel, LocalModel, FusionModel, test_loader):
 			# compute output
 			output_global, fm_global, pool_global = GlobalModel(image_cuda)
 			
-			image_patch = AttentionGenPatchs(image_cuda.cpu(), fm_global, tuple(exp_cfg['dataset']['crop'])).to(device)
+			image_patch = AttentionGenPatchs(image_cuda.cpu(), fm_global).to(device)
 
 			output_local, _, pool_local = LocalModel(image_patch)
 
