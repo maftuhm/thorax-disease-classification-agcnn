@@ -113,7 +113,7 @@ def drawImage(images, labels, images_cropped, coordinates):
 
 	new_images = Image.new('RGB', (bz * w, 2 * h), (0, 0, 0))
 	
-	unnormalize = transforms.UnNormalize(
+	unnormalize = UnNormalize(
 	   mean=[0.485, 0.456, 0.406],
 	   std=[0.229, 0.224, 0.225]
 	)
