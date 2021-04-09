@@ -172,16 +172,19 @@ def main():
 
 			running_loss += loss.data.item() * batch_multiplier
 
+			if i % 500 == 0:
+				drawImage(image, str(target), output['image_patch'].cpu(), output['coordinates'])
+
 		progressbar.close()
 
 		lr_scheduler.step()
 
 		# SAVE MODEL
-		# save_model(args.exp_dir, epoch,
-		# 			model = GlobalModel,
-		# 			optimizer = optimizer_global,
-		# 			lr_scheduler = lr_scheduler_global,
-		# 			branch_name = 'global')
+		save_model(args.exp_dir, epoch,
+					model = Model,
+					optimizer = optimizer,
+					lr_scheduler = lr_scheduler,
+					branch_name = 'model')
 		# save_model(args.exp_dir, epoch,
 		# 			model = LocalModel,
 		# 			optimizer = optimizer_local,
@@ -238,24 +241,26 @@ def test(Model, test_loader):
 	AUROCs_fusion = compute_AUCs(ground_truth, pred_fusion)
 	AUROCs_fusion_avg = np.array(AUROCs_fusion).mean()
 
-	if AUROCs_global_avg > best_AUCs['global']:
-		best_AUCs['global'] = AUROCs_global_avg
-		save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global.pth')
-		copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global_best.pth')
-		shutil.copyfile(save_name, copy_name)
-		print(" Global best model is saved: {}".format(copy_name))
+	# if AUROCs_global_avg > best_AUCs['global']:
+	# 	best_AUCs['global'] = AUROCs_global_avg
+	# 	save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global.pth')
+	# 	copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global_best.pth')
+	# 	shutil.copyfile(save_name, copy_name)
+	# 	print(" Global best model is saved: {}".format(copy_name))
 
-	if AUROCs_local_avg > best_AUCs['local']:
-		best_AUCs['local'] = AUROCs_local_avg
-		save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_local.pth')
-		copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_local_best.pth')
-		shutil.copyfile(save_name, copy_name)
-		print(" Local best model is saved: {}".format(copy_name))
+	# if AUROCs_local_avg > best_AUCs['local']:
+	# 	best_AUCs['local'] = AUROCs_local_avg
+	# 	save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_local.pth')
+	# 	copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_local_best.pth')
+	# 	shutil.copyfile(save_name, copy_name)
+	# 	print(" Local best model is saved: {}".format(copy_name))
 
-	if AUROCs_fusion_avg > best_AUCs['fusion']:
-		best_AUCs['fusion'] = AUROCs_fusion_avg
-		save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_fusion.pth')
-		copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_fusion_best.pth')
+	mean_AUROCs_all = (AUROCs_global_avg + AUROCs_local_avg + AUROCs_fusion_avg) / 3
+
+	if mean_AUROCs_all > best_AUCs['global']:
+		best_AUCs['global'] = mean_AUROCs_all
+		save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_model.pth')
+		copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_model_best.pth')
 		shutil.copyfile(save_name, copy_name)
 		print(" Fusion best model is saved: {}".format(copy_name))
 
