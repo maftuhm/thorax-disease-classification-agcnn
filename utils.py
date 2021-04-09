@@ -96,7 +96,7 @@ def drawImage(images, labels, images_cropped, coordinates):
 
 	new_images = Image.new('RGB', (bz * w, 2 * h), (0, 0, 0))
 
-	for i in range(size[0]):
+	for i in range(bz):
 
 		img = transforms.ToPILImage()(images[i])
 		img_patch = transforms.ToPILImage()(images_cropped[i])
@@ -105,7 +105,8 @@ def drawImage(images, labels, images_cropped, coordinates):
 		draw_img.rectangle(coordinates, outline=(0, 255, 0))
 		draw_img.text((coordinates[0], coordinates[1] - 10), labels[i], (0, 255, 0))
 
-		new_image.paste(img, (i * w, 0))
-		new_image.paste(img_patch, (i * w, w))
+		new_images.paste(img, (i * w, 0))
+		new_images.paste(img_patch, (i * w, w))
 
+	new_images = transforms.ToTensor()(new_images).unsqueeze(0)
 	return new_images

@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-# from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 import torch.backends.cudnn as cudnn
 
 import torchvision.transforms as transforms
@@ -46,7 +46,7 @@ best_AUCs = {
 
 cudnn.benchmark = True
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-# writer = SummaryWriter(args.exp_dir + '/log')
+writer = SummaryWriter(args.exp_dir + '/log')
 
 def main():
 	# ================= TRANSFORMS ================= #
@@ -130,6 +130,9 @@ def main():
 		Model.train()
 		
 		running_loss = 0.
+		running_global_loss = 0.
+		running_local_loss = 0.
+		running_fusion_loss = 0.
 		mini_batch_loss = 0.
 
 		count = 0
@@ -171,9 +174,13 @@ def main():
 			progressbar.update(1)
 
 			running_loss += loss.data.item() * batch_multiplier
+			running_global_loss += global_loss
+			running_local_loss += local_loss
+			running_fusion_loss += fusion_loss
 
-			if i % 500 == 0:
-				drawImage(image, str(target), output['image_patch'].cpu(), output['coordinates'])
+			if (i + 1) % 500 == 0:
+				draw_image = drawImage(image, str(target), output['image_patch'].cpu(), output['coordinates'])
+				writer.add_images("Train/img_{}".format(i), draw_image, epoch)
 
 		progressbar.close()
 
@@ -198,6 +205,13 @@ def main():
 
 		epoch_train_loss = float(running_loss) / float(i)
 		print(' Epoch over Loss: {:.5f}'.format(epoch_train_loss))
+		
+		writer.add_scalar("Train/loss", epoch_train_loss, epoch)
+		writer.add_scalars("Train/losses", {'global_loss': running_global_loss / float(i),
+											'local_loss': running_local_loss / float(i),
+											'fusion_loss': running_fusion_loss / float(i)}, epoch)
+		writer.flush()
+
 		test(Model, val_loader)
 
 def test(Model, test_loader):
@@ -225,10 +239,13 @@ def test(Model, test_loader):
 			output['local']
 			output['fusion']
 
-
 			pred_global = torch.cat((pred_global, output['global'].data), 0)
 			pred_local = torch.cat((pred_local, output['local'].data), 0)
 			pred_fusion = torch.cat((pred_fusion, output['fusion'].data), 0)
+
+			if i % 500 == 0:
+				draw_image = drawImage(image, str(target), output['image_patch'].cpu(), output['coordinates'])
+				writer.add_images("Val/img_{}".format(i), draw_image, epoch)
 
 			progressbar.update(1)
 
