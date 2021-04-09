@@ -32,11 +32,11 @@ with open(path.join(args.exp_dir, "cfg.json")) as f:
 	exp_cfg = json.load(f)
 
 # ================= CONSTANTS ================= #
-data_dir = path.join('D:/', 'Data', 'data')
+data_dir = path.join('..', 'lung-disease-detection', 'data')
 classes_name = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass', 'Nodule', 'Pneumonia',
 				'Pneumothorax', 'Consolidation', 'Edema', 'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia']
 
-max_batch_capacity = 1
+max_batch_capacity = 8
 
 best_AUCs = {
 	'global': -1000,
@@ -195,13 +195,11 @@ def main():
 
 		epoch_train_loss = float(running_loss) / float(i)
 		print(' Epoch over Loss: {:.5f}'.format(epoch_train_loss))
-		# test(GlobalModel, LocalModel, FusionModel, val_loader)
+		test(Model, val_loader)
 
-def test(GlobalModel, LocalModel, FusionModel, test_loader):
+def test(Model, test_loader):
 
-	GlobalModel.eval()
-	LocalModel.eval()
-	FusionModel.eval()
+	Model.eval()
 
 	ground_truth = torch.FloatTensor().to(device)
 	pred_global = torch.FloatTensor().to(device)
@@ -218,17 +216,16 @@ def test(GlobalModel, LocalModel, FusionModel, test_loader):
 			ground_truth = torch.cat((ground_truth, target_cuda), 0)
 
 			# compute output
-			output_global, fm_global, pool_global = GlobalModel(image_cuda)
-			
-			image_patch = AttentionGenPatchs(image_cuda.cpu(), fm_global, tuple(exp_cfg['dataset']['crop'])).to(device)
+			output = Model(image_cuda, target_cuda)
+						# loss
+			output['global']
+			output['local']
+			output['fusion']
 
-			output_local, _, pool_local = LocalModel(image_patch)
 
-			output_fusion = FusionModel(pool_global, pool_local)
-			
-			pred_global = torch.cat((pred_global, output_global.data), 0)
-			pred_local = torch.cat((pred_local, output_local.data), 0)
-			pred_fusion = torch.cat((pred_fusion, output_fusion.data), 0)
+			pred_global = torch.cat((pred_global, output['global'].data), 0)
+			pred_local = torch.cat((pred_local, output['local'].data), 0)
+			pred_fusion = torch.cat((pred_fusion, output['fusion'].data), 0)
 
 			progressbar.update(1)
 
