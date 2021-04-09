@@ -179,7 +179,7 @@ def main():
 			running_fusion_loss += fusion_loss
 
 			if (i + 1) % 500 == 0:
-				draw_image = drawImage(image, str(target), output['image_patch'].cpu(), output['coordinates'])
+				draw_image = drawImage(image, target, output['image_patch'].detach().cpu(), output['coordinates'])
 				writer.add_images("Train/img_{}".format(i), draw_image, epoch)
 
 		progressbar.close()

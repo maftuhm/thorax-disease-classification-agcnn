@@ -101,6 +101,7 @@ class AttentionGuidedNet(nn.Module):
 		n, c, h, w = ori_image.shape
 
 		cropped_image = torch.randn(batch_size, c, w, h, dtype=ori_image.dtype, device=ori_image.device)
+		coordinates = []
 
 		for b in range(batch_size):
 			heatmap = torch.abs(features_global[b])
@@ -127,8 +128,9 @@ class AttentionGuidedNet(nn.Module):
 			image = transforms.ToPILImage()(ori_image[b][:, xmin:xmax, ymin:ymax].cpu())
 			heatmap = transforms.Resize((h, w))(image)
 			cropped_image[b] = transforms.ToTensor()(heatmap)
+			coordinates.append((xmin, xmax, ymin, ymax))
 
-		return cropped_image.to(ori_image.dtype), (xmin, xmax, ymin, ymax)
+		return cropped_image.to(ori_image.dtype), coordinates
 
 	def _select_max_connect(self, heatmap):
 		labeled_img, num = measure.label(heatmap, connectivity = 2, background = 0, return_num = True)    

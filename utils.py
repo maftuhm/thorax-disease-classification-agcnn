@@ -91,19 +91,43 @@ def compute_AUCs(gt, pred):
 		AUROCs.append(roc_auc_score(gt_np[:, i], pred_np[:, i]))
 	return AUROCs
 
+class UnNormalize(object):
+	def __init__(self, mean, std):
+		self.mean = mean
+		self.std = std
+
+	def __call__(self, tensor):
+		"""
+		Args:
+			tensor (Tensor): Tensor image of size (C, H, W) to be normalized.
+		Returns:
+			Tensor: Normalized image.
+		"""
+		for t, m, s in zip(tensor, self.mean, self.std):
+			t.mul_(s).add_(m)
+			# The normalize code -> t.sub_(m).div_(s)
+		return tensor
+
 def drawImage(images, labels, images_cropped, coordinates):
 	bz, c, h, w = images.shape # batch_size, channel, height, width
 
 	new_images = Image.new('RGB', (bz * w, 2 * h), (0, 0, 0))
+	
+	unnormalize = transforms.UnNormalize(
+	   mean=[0.485, 0.456, 0.406],
+	   std=[0.229, 0.224, 0.225]
+	)
 
 	for i in range(bz):
+		img = unnormalize(images[i])
+		img = transforms.ToPILImage()(img)
 
-		img = transforms.ToPILImage()(images[i])
-		img_patch = transforms.ToPILImage()(images_cropped[i])
+		img_patch = unnormalize(images_cropped[i])
+		img_patch = transforms.ToPILImage()(img_patch)
 
 		draw_img = ImageDraw.Draw(img)
-		draw_img.rectangle(coordinates, outline=(0, 255, 0))
-		draw_img.text((coordinates[0], coordinates[1] - 10), labels[i], (0, 255, 0))
+		draw_img.rectangle(coordinates[i], outline=(0, 255, 0))
+		draw_img.text((coordinates[i][0], coordinates[i][1] - 10), str(labels[i]), (0, 255, 0))
 
 		new_images.paste(img, (i * w, 0))
 		new_images.paste(img_patch, (i * w, w))
