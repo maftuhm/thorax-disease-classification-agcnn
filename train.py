@@ -1,389 +1,355 @@
-import re
 import os
-import cv2
-import time
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.backends.cudnn as cudnn
-from torch.optim import lr_scheduler
-import torch.optim as optim
-import torchvision
-import torchvision.transforms as transforms
-from torch.utils.data import DataLoader
-from read_data import ChestXrayDataSet
-from sklearn.metrics import roc_auc_score
-from skimage.measure import label
-from model import DenseNet121, Fusion_Branch
-from PIL import Image
+import os.path as path
+import json
+import argparse
 from tqdm import tqdm
 
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+import torch.backends.cudnn as cudnn
+
+import torchvision.transforms as transforms
+
+from read_data import ChestXrayDataSet
+from model import Net, FusionNet
+from utils import *
+
 def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--use', type=str, default='train', help='use for what (train or test)')
-    parser.add_argument("--exp_dir", type=str, default="./experiments/exp0")
-    args = parser.parse_args()
-    return args
+	parser = argparse.ArgumentParser(description='AG-CNN')
+	parser.add_argument('--use', type=str, default='train', help='use for what (train or test)')
+	parser.add_argument("--exp_dir", type=str, default="./experiments/exp7")
+	parser.add_argument("--resume", "-r", action="store_true")
+	args = parser.parse_args()
+	return args
 
 args = parse_args()
 
-# ------------ config ------------
-exp_dir = args.exp_dir
-exp_name = exp_dir.split('/')[-1]
+# Load config json file
+with open(path.join(args.exp_dir, "cfg.json")) as f:
+	exp_cfg = json.load(f)
 
-with open(os.path.join(exp_dir, "cfg.json")) as f:
-    exp_cfg = json.load(f)
+# ================= CONSTANTS ================= #
+data_dir = path.join('..', 'lung-disease-detection', 'data')
+classes_name = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass', 'Nodule', 'Pneumonia',
+				'Pneumothorax', 'Consolidation', 'Edema', 'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia']
 
+max_batch_capacity = 8
 
-CLASS_NAMES = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass', 'Nodule', 'Pneumonia',
-                'Pneumothorax', 'Consolidation', 'Edema', 'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia']
+best_AUCs = {
+	'global': -1000,
+	'local': -1000,
+	'fusion': -1000
+}
 
-# load with your own dataset path
-DATA_DIR = os.path.join('D://', 'Data', 'data', 'images')
-TRAIN_IMAGE_LIST = os.path.join('D://', 'Data', 'data', 'labels', 'train_list.txt')
-VAL_IMAGE_LIST = os.path.join('D://', 'Data', 'data', 'labels', 'val_list.txt')
-save_model_path = 'model-AG-CNN'
-save_model_name = 'AG_CNN'
-
-# learning rate
-LR_G = 1e-8
-LR_L = 1e-8
-LR_F = 1e-3
-num_epochs = 50
-BATCH_SIZE = 2
-
-normalize = transforms.Normalize(
-   mean=[0.485, 0.456, 0.406],
-   std=[0.229, 0.224, 0.225]
-)
-preprocess = transforms.Compose([
-   transforms.Resize((256,256)),
-   transforms.CenterCrop(224),
-   transforms.ToTensor(),
-   normalize,
-])
-
-
-def Attention_gen_patchs(ori_image, fm_cuda):
-    # feature map -> feature mask (using feature map to crop on the original image) -> crop -> patchs
-    feature_conv = fm_cuda.data.cpu().numpy()
-    size_upsample = (224, 224) 
-    bz, nc, h, w = feature_conv.shape
-
-    patchs_cuda = torch.FloatTensor().cuda()
-
-    for i in range(0, bz):
-        feature = feature_conv[i]
-        cam = feature.reshape((nc, h*w))
-        cam = cam.sum(axis=0)
-        cam = cam.reshape(h,w)
-        cam = cam - np.min(cam)
-        cam_img = cam / np.max(cam)
-        cam_img = np.uint8(255 * cam_img)
-
-        heatmap_bin = binImage(cv2.resize(cam_img, size_upsample))
-        heatmap_maxconn = selectMaxConnect(heatmap_bin)
-        heatmap_mask = heatmap_bin * heatmap_maxconn
-
-        ind = np.argwhere(heatmap_mask != 0)
-        minh = min(ind[:,0])
-        minw = min(ind[:,1])
-        maxh = max(ind[:,0])
-        maxw = max(ind[:,1])
-        
-        # to ori image 
-        image = ori_image[i].numpy().reshape(224,224,3)
-        image = image[int(224*0.334):int(224*0.667),int(224*0.334):int(224*0.667),:]
-
-        image = cv2.resize(image, size_upsample)
-        image_crop = image[minh:maxh,minw:maxw,:] * 256 # because image was normalized before
-        image_crop = preprocess(Image.fromarray(image_crop.astype('uint8')).convert('RGB')) 
-
-        img_variable = torch.autograd.Variable(image_crop.reshape(3,224,224).unsqueeze(0).cuda())
-
-        patchs_cuda = torch.cat((patchs_cuda,img_variable),0)
-
-    return patchs_cuda
-
-
-def binImage(heatmap, t = 0.7):
-
-    _, heatmap_bin = cv2.threshold(heatmap , int(255 * t) , 255 , cv2.THRESH_BINARY)
-
-    return heatmap_bin
-
-
-def selectMaxConnect(heatmap):
-    labeled_img, num = label(heatmap, connectivity=2, background=0, return_num=True)    
-    max_label = 0
-    max_num = 0
-    for i in range(1, num+1):
-        if np.sum(labeled_img == i) > max_num:
-            max_num = np.sum(labeled_img == i)
-            max_label = i
-    lcc = (labeled_img == max_label)
-    if max_num == 0:
-       lcc = (labeled_img == -1)
-    lcc = lcc + 0
-    return lcc 
-
+cudnn.benchmark = True
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+writer = SummaryWriter(args.exp_dir + '/log')
 
 def main():
-    print('********************load data********************')
-    normalize = transforms.Normalize([0.485, 0.456, 0.406],
-                                     [0.229, 0.224, 0.225])
+	# ================= TRANSFORMS ================= #
+	normalize = transforms.Normalize(
+	   mean=[0.485, 0.456, 0.406],
+	   std=[0.229, 0.224, 0.225]
+	)
 
-    train_dataset = ChestXrayDataSet(data_dir=DATA_DIR,
-                                    image_list_file=TRAIN_IMAGE_LIST,
-                                    transform=transforms.Compose([
-                                        transforms.Resize(224),
-                                        transforms.CenterCrop(224),
-                                        transforms.ToTensor(),
-                                        normalize,
-                                    ]))
-    train_loader = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE,
-                             shuffle=True, num_workers=0)
-    
-    test_dataset = ChestXrayDataSet(data_dir=DATA_DIR,
-                                    image_list_file=VAL_IMAGE_LIST,
-                                    transform=transforms.Compose([
-                                        transforms.Resize(256),
-                                        transforms.CenterCrop(224),
-                                        transforms.ToTensor(),
-                                        normalize,
-                                    ]))
-    test_loader = DataLoader(dataset=test_dataset, batch_size=2,
-                             shuffle=False, num_workers=0)
-    print('********************load data succeed!********************')
+	transform_train = transforms.Compose([
+	   transforms.Resize(tuple(exp_cfg['dataset']['resize'])),
+	   transforms.RandomResizedCrop(tuple(exp_cfg['dataset']['crop'])),
+	   transforms.RandomHorizontalFlip(),
+	   transforms.ToTensor(),
+	   normalize,
+	])
 
+	transform_test = transforms.Compose([
+	   transforms.Resize(tuple(exp_cfg['dataset']['resize'])),
+	   transforms.CenterCrop(tuple(exp_cfg['dataset']['crop'])),
+	   transforms.ToTensor(),
+	   normalize,
+	])
 
-    print('********************load model********************')
-    # initialize and load the model
-    Global_Branch_model = DenseNet121().cuda()
-    Local_Branch_model = DenseNet121().cuda()
-    Fusion_Branch_model = Fusion_Branch(input_size = 2048, output_size = N_CLASSES).cuda()
+	# ================= LOAD DATASET ================= #
+	train_dataset = ChestXrayDataSet(data_dir = data_dir,split = 'train', transform = transform_train)
+	train_loader = DataLoader(dataset = train_dataset, batch_size = max_batch_capacity, shuffle = True, num_workers = 4)
 
-    if os.path.isfile(CKPT_PATH):
-        print("=> loading checkpoint")
-        checkpoint = torch.load(CKPT_PATH)
-        # to load state
-        # Code modified from torchvision densenet source for loading from pre .4 densenet weights.
-        state_dict = checkpoint['state_dict']
-        remove_data_parallel = True # Change if you don't want to use nn.DataParallel(model)
+	val_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'val', transform = transform_test)
+	val_loader = DataLoader(dataset = val_dataset, batch_size = 32, shuffle = False, num_workers = 4)
 
-        pattern = re.compile(
-            r'^(.*denselayer\d+\.(?:norm|relu|conv))\.((?:[12])\.(?:weight|bias|running_mean|running_var))$')
-        for key in list(state_dict.keys()):
-            ori_key =  key
-            key = key.replace('densenet121.','')
-            #print('key',key)
-            match = pattern.match(key)
-            new_key = match.group(1) + match.group(2) if match else key
-            new_key = new_key[7:] if remove_data_parallel else new_key
-            #print('new_key',new_key)
-            if '.0.' in new_key:
-                new_key = new_key.replace('0.','')
-            state_dict[new_key] = state_dict[ori_key]
-            # Delete old key only if modified.
-            if match or remove_data_parallel: 
-                del state_dict[ori_key]
-        
-        Global_Branch_model.load_state_dict(state_dict)
-        Local_Branch_model.load_state_dict(state_dict)
-        print("=> loaded baseline checkpoint")
-        
-    else:
-        print("=> no checkpoint found")
+	test_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'test', transform = transform_test)
+	test_loader = DataLoader(dataset = test_dataset, batch_size = 32, shuffle = False, num_workers = 4)
 
-    if os.path.isfile(CKPT_PATH_G):
-        checkpoint = torch.load(CKPT_PATH_G)
-        Global_Branch_model.load_state_dict(checkpoint)
-        print("=> loaded Global_Branch_model checkpoint")
+	# ================= MODELS ================= #
+	GlobalModel = Net(exp_cfg['backbone']).to(device)
+	LocalModel = Net(exp_cfg['backbone']).to(device)
+	FusionModel = FusionNet(exp_cfg['backbone']).to(device)
 
-    if os.path.isfile(CKPT_PATH_L):
-        checkpoint = torch.load(CKPT_PATH_L)
-        Local_Branch_model.load_state_dict(checkpoint)
-        print("=> loaded Local_Branch_model checkpoint")
+	# ================= OPTIMIZER ================= #
+	optimizer_global = optim.SGD(GlobalModel.parameters(), **exp_cfg['optimizer']['SGD'])
+	optimizer_local = optim.SGD(LocalModel.parameters(), **exp_cfg['optimizer']['SGD'])
+	optimizer_fusion = optim.SGD(FusionModel.parameters(), **exp_cfg['optimizer']['SGD'])
 
-    if os.path.isfile(CKPT_PATH_F):
-        checkpoint = torch.load(CKPT_PATH_F)
-        Fusion_Branch_model.load_state_dict(checkpoint)
-        print("=> loaded Fusion_Branch_model checkpoint")
+	# ================= SCHEDULER ================= #
+	lr_scheduler_global = optim.lr_scheduler.StepLR(optimizer_global , **exp_cfg['lr_scheduler'])
+	lr_scheduler_local = optim.lr_scheduler.StepLR(optimizer_local , **exp_cfg['lr_scheduler'])
+	lr_scheduler_fusion = optim.lr_scheduler.StepLR(optimizer_fusion , **exp_cfg['lr_scheduler'])
 
-    cudnn.benchmark = True
-    criterion = nn.BCELoss()
-    optimizer_global = optim.Adam(Global_Branch_model.parameters(), lr=LR_G, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-5)
-    lr_scheduler_global = lr_scheduler.StepLR(optimizer_global , step_size = 10, gamma = 1)
-    
-    optimizer_local = optim.Adam(Local_Branch_model.parameters(), lr=LR_L, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-5)
-    lr_scheduler_local = lr_scheduler.StepLR(optimizer_local , step_size = 10, gamma = 1)
-    
-    optimizer_fusion = optim.Adam(Fusion_Branch_model.parameters(), lr=LR_F, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-5)
-    lr_scheduler_fusion = lr_scheduler.StepLR(optimizer_fusion , step_size = 15, gamma = 0.1)
-    print('********************load model succeed!********************')
+	# ================= LOSS FUNCTION ================= #
+	criterion = nn.BCELoss()
 
-    print('********************begin training!********************')
-    for epoch in range(num_epochs):
-        since = time.time()
-        print('Epoch [{}/{}]\tTotal Iterasi [{}]'.format(epoch , num_epochs - 1, len(train_loader)))
-        print('-' * 10)
-        #set the mode of model
-        Global_Branch_model.train()  #set model to training mode
-        Local_Branch_model.train()
-        Fusion_Branch_model.train()
+	if args.resume:
+		start_epoch = 0
+		checkpoint_global = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global.pth')
+		checkpoint_local = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_local.pth')
+		checkpoint_fusion = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_fusion.pth')
 
-        running_loss = 0.0
-        count = 0
-        batch_multiplier = 8
-        #Iterate over data
-        for i, (input, target) in tqdm(enumerate(train_loader)):
-            print("\ntorch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated()/1024/1024/1024))
-            print("torch.cuda.memory_cached: %fGB"%(torch.cuda.memory_cached()/1024/1024/1024))
-            input_var = torch.autograd.Variable(input.cuda())
-            target_var = torch.autograd.Variable(target.cuda())
+		if path.isfile(checkpoint_global):
+			save_dict = torch.load(checkpoint_global)
+			start_epoch = max(save_dict['epoch'], start_epoch)
+			GlobalModel.load_state_dict(save_dict['net'])
+			optimizer_global.load_state_dict(save_dict['optim'])
+			lr_scheduler_global.load_state_dict(save_dict['lr_scheduler'])
+			print(" Loaded Global Branch Model checkpoint")
 
-            if count == 0:
-                optimizer_global.step()
-                optimizer_local.step()
-                optimizer_fusion.step()
-                optimizer_global.zero_grad()
-                optimizer_local.zero_grad()
-                optimizer_fusion.zero_grad()
-                count = batch_multiplier
+		if path.isfile(checkpoint_local):
+			save_dict = torch.load(checkpoint_local)
+			start_epoch = max(save_dict['epoch'], start_epoch)
+			LocalModel.load_state_dict(save_dict['net'])
+			optimizer_local.load_state_dict(save_dict['optim'])
+			lr_scheduler_local.load_state_dict(save_dict['lr_scheduler'])
+			print(" Loaded Local Branch Model checkpoint")
 
-            # compute output
-            output_global, fm_global, pool_global = Global_Branch_model(input_var)
-            
-            patchs_var = Attention_gen_patchs(input,fm_global)
+		if path.isfile(checkpoint_fusion):
+			save_dict = torch.load(checkpoint_fusion)
+			start_epoch = max(save_dict['epoch'], start_epoch)
+			FusionModel.load_state_dict(save_dict['net'])
+			optimizer_fusion.load_state_dict(save_dict['optim'])
+			lr_scheduler_fusion.load_state_dict(save_dict['lr_scheduler'])
+			print(" Loaded Fusion Branch Model checkpoint")
 
-            output_local, _, pool_local = Local_Branch_model(patchs_var)
-            #print(fusion_var.shape)
-            output_fusion = Fusion_Branch_model(pool_global, pool_local)
-            #
+		start_epoch += 1
 
-            # loss
-            loss1 = criterion(output_global, target_var)
-            loss2 = criterion(output_local, target_var)
-            loss3 = criterion(output_fusion, target_var)
-            #
+	else:
+		start_epoch = 0
+		write_csv(path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_AUROCs.csv'),
+							data = ['Model'] + classes_name + ['Mean'],
+							mode = 'w')
 
-            loss = (loss1 * 0.8 + loss2 * 0.1 + loss3 * 0.1) / batch_multiplier
-            loss.backward()
-            count -= 1
-            
-            if (i%200) == 0: 
-                print('step: {} totalloss: {loss:.3f} loss1: {loss1:.3f} loss2: {loss2:.3f} loss3: {loss3:.3f}'.format(i, loss = loss, loss1 = loss1, loss2 = loss2, loss3 = loss3))
+	for epoch in range(start_epoch, exp_cfg['NUM_EPOCH']):
+		print(' Epoch [{}/{}]'.format(epoch , exp_cfg['NUM_EPOCH'] - 1))
 
+		GlobalModel.train()
+		LocalModel.train()
+		FusionModel.train()
+		
+		running_loss = 0.
+		running_global_loss = 0.
+		running_local_loss = 0.
+		running_fusion_loss = 0.
+		mini_batch_loss = 0.
 
+		count = 0
+		batch_multiplier = 16
 
-            #print(loss.data.item())
-            running_loss += loss.data.item()
-            #break
-            '''
-            if i == 40:
-                print('break')
-                break
-            '''
+		progressbar = tqdm(range(len(train_loader)))
 
-        lr_scheduler_global.step()  #about lr and gamma
-        lr_scheduler_local.step() 
-        lr_scheduler_fusion.step() 
+		for i, (image, target) in enumerate(train_loader):
 
-        epoch_loss = float(running_loss) / float(i)
-        print(' Epoch over  Loss: {:.5f}'.format(epoch_loss))
+			if count == 0:
+				optimizer_global.step()
+				optimizer_local.step()
+				optimizer_fusion.step()
 
-        print('*******testing!*********')
-        test(Global_Branch_model, Local_Branch_model, Fusion_Branch_model,test_loader)
-        #break
+				optimizer_global.zero_grad()
+				optimizer_local.zero_grad()
+				optimizer_fusion.zero_grad()
 
-        #save
-        if epoch % 1 == 0:
-            save_path = save_model_path
-            torch.save(Global_Branch_model.state_dict(), save_path+save_model_name+'_Global'+'_epoch_'+str(epoch)+'.pkl')
-            print('Global_Branch_model already save!')
-            torch.save(Local_Branch_model.state_dict(), save_path+save_model_name+'_Local'+'_epoch_'+str(epoch)+'.pkl')
-            print('Local_Branch_model already save!')
-            torch.save(Fusion_Branch_model.state_dict(), save_path+save_model_name+'_Fusion'+'_epoch_'+str(epoch)+'.pkl')            
-            print('Fusion_Branch_model already save!')
+				count = batch_multiplier
 
-        time_elapsed = time.time() - since
-        print('Training one epoch complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60 , time_elapsed % 60))
-    
+			# compute output
+			output_global, fm_global, pool_global = GlobalModel(image.to(device))
+			
+			image_patch, coordinates = AttentionGenPatchs(image.detach(), fm_global.detach().cpu())
 
-def test(model_global, model_local, model_fusion, test_loader):
+			output_local, _, pool_local = LocalModel(image_patch.to(device))
 
-    # initialize the ground truth and output tensor
-    gt = torch.FloatTensor().cuda()
-    pred_global = torch.FloatTensor().cuda()
-    pred_local = torch.FloatTensor().cuda()
-    pred_fusion = torch.FloatTensor().cuda()
+			output_fusion = FusionModel(pool_global, pool_local)
 
-    # switch to evaluate mode
-    model_global.eval()
-    model_local.eval()
-    model_fusion.eval()
-    cudnn.benchmark = True
+			# loss
+			global_loss = criterion(output_global, target.to(device))
+			local_loss = criterion(output_local, target.to(device))
+			fusion_loss = criterion(output_fusion, target.to(device))
 
-    for i, (inp, target) in enumerate(test_loader):
-        with torch.no_grad():
+			loss = (0.8 * global_loss + 0.1 * local_loss + 0.1 * fusion_loss) / batch_multiplier
+			loss.backward()
+			count -= 1
+			
+			progressbar.set_description(" bacth loss: {loss:.3f} "
+										"loss1: {loss1:.3f} "
+										"loss2: {loss2:.3f} "
+										"loss3: {loss3:.3f}".format(loss = loss * batch_multiplier,
+																	loss1 = global_loss.data.item(),
+																	loss2 = local_loss.data.item(),
+																	loss3 = fusion_loss.data.item()))
 
-            target = target.cuda()
-            gt = torch.cat((gt, target), 0)
-            input_var = torch.autograd.Variable(inp.cuda())
-            #output = model_global(input_var)
+			if (i + 1) % 1000 == 0:
+				target_embedding = []
+				for label in target:
+					text_label = [classes_name[i] for i, a in enumerate(label) if a != 0]
+					text_label = '|'.join(text_label)
 
-            output_global, fm_global, pool_global = model_global(input_var)
-            
-            patchs_var = Attention_gen_patchs(inp,fm_global)
+					if len(text_label) == 0:
+					    text_label = 'No Finding'
 
-            output_local, _, pool_local = model_local(patchs_var)
+					target_embedding.append(text_label)
 
-            output_fusion = model_fusion(pool_global,pool_local)
+				draw_image = drawImage(image, target_embedding, image_patch.detach(), coordinates)
+				writer.add_images("Train/epoch_{}".format(epoch), draw_image, i + 1)
 
-            pred_global = torch.cat((pred_global, output_global.data), 0)
-            pred_local = torch.cat((pred_local, output_local.data), 0)
-            pred_fusion = torch.cat((pred_fusion, output_fusion.data), 0)
-            
-    AUROCs_g = compute_AUCs(gt, pred_global)
-    AUROC_avg = np.array(AUROCs_g).mean()
-    print('Global branch: The average AUROC is {AUROC_avg:.3f}'.format(AUROC_avg=AUROC_avg))
-    for i in range(N_CLASSES):
-        print('The AUROC of {} is {}'.format(CLASS_NAMES[i], AUROCs_g[i]))
+			progressbar.update(1)
 
-    AUROCs_l = compute_AUCs(gt, pred_local)
-    AUROC_avg = np.array(AUROCs_l).mean()
-    print('\n')
-    print('Local branch: The average AUROC is {AUROC_avg:.3f}'.format(AUROC_avg=AUROC_avg))
-    for i in range(N_CLASSES):
-        print('The AUROC of {} is {}'.format(CLASS_NAMES[i], AUROCs_l[i]))
+			running_loss += loss.data.item() * batch_multiplier
+			running_global_loss += global_loss.data.item()
+			running_local_loss += local_loss.data.item()
+			running_fusion_loss += fusion_loss.data.item()
 
-    AUROCs_f = compute_AUCs(gt, pred_fusion)
-    AUROC_avg = np.array(AUROCs_f).mean()
-    print('\n')
-    print('Fusion branch: The average AUROC is {AUROC_avg:.3f}'.format(AUROC_avg=AUROC_avg))
-    for i in range(N_CLASSES):
-        print('The AUROC of {} is {}'.format(CLASS_NAMES[i], AUROCs_f[i]))
+		progressbar.close()
 
+		lr_scheduler_global.step()
+		lr_scheduler_local.step()
+		lr_scheduler_fusion.step()
 
-def compute_AUCs(gt, pred):
-    """Computes Area Under the Curve (AUC) from prediction scores.
+		# SAVE MODEL
+		save_model(args.exp_dir, epoch,
+					model = GlobalModel,
+					optimizer = optimizer_global,
+					lr_scheduler = lr_scheduler_global,
+					branch_name = 'global')
+		save_model(args.exp_dir, epoch,
+					model = LocalModel,
+					optimizer = optimizer_local,
+					lr_scheduler = lr_scheduler_local,
+					branch_name = 'local')
+		save_model(args.exp_dir, epoch,
+					model = FusionModel,
+					optimizer = optimizer_fusion,
+					lr_scheduler = lr_scheduler_fusion,
+					branch_name = 'fusion')
 
-    Args:
-        gt: Pytorch tensor on GPU, shape = [n_samples, n_classes]
-          true binary labels.
-        pred: Pytorch tensor on GPU, shape = [n_samples, n_classes]
-          can either be probability estimates of the positive class,
-          confidence values, or binary decisions.
+		epoch_train_loss = float(running_loss) / float(i)
+		print(' Epoch over Loss: {:.5f}'.format(epoch_train_loss))
+		writer.add_scalar("Train/loss", epoch_train_loss, epoch)
+		writer.add_scalars("Train/losses", {'global_loss': running_global_loss / float(i),
+											'local_loss': running_local_loss / float(i),
+											'fusion_loss': running_fusion_loss / float(i)}, epoch)
+		writer.flush()
 
-    Returns:
-        List of AUROCs of all classes.
-    """
-    AUROCs = []
-    gt_np = gt.cpu().numpy()
-    pred_np = pred.cpu().numpy()
-    for i in range(N_CLASSES):
-        AUROCs.append(roc_auc_score(gt_np[:, i], pred_np[:, i]))
-    return AUROCs
+		test(GlobalModel, LocalModel, FusionModel, val_loader)
 
-if __name__ == '__main__':
-    main()
+def test(GlobalModel, LocalModel, FusionModel, test_loader):
+
+	GlobalModel.eval()
+	LocalModel.eval()
+	FusionModel.eval()
+
+	ground_truth = torch.FloatTensor()
+	pred_global = torch.FloatTensor()
+	pred_local = torch.FloatTensor()
+	pred_fusion = torch.FloatTensor()
+
+	progressbar = tqdm(range(len(test_loader)))
+
+	with torch.no_grad():
+		for i, (image, target) in enumerate(test_loader):
+
+			# compute output
+			output_global, fm_global, pool_global = GlobalModel(image.to(device))
+			
+			image_patch, coordinates = AttentionGenPatchs(image.detach(), fm_global.detach().cpu())
+
+			output_local, _, pool_local = LocalModel(image_patch.to(device))
+
+			output_fusion = FusionModel(pool_global, pool_local)
+
+			ground_truth = torch.cat((ground_truth, target.detach()), 0)
+			pred_global = torch.cat((pred_global, output_global.data.item()), 0)
+			pred_local = torch.cat((pred_local, output_local.data.item()), 0)
+			pred_fusion = torch.cat((pred_fusion, output_fusion.data.item()), 0)
+
+			if (i + 1) % 300 == 0:
+				target_embedding = []
+				for label in target:
+					text_label = [classes_name[i] for i, a in enumerate(label) if a != 0]
+					text_label = '|'.join(text_label)
+
+					if len(text_label) == 0:
+					    text_label = 'No Finding'
+
+					target_embedding.append(text_label)
+
+				draw_image = drawImage(image, target_embedding, image_patch.detach(), coordinates)
+				writer.add_images("Train/epoch_{}".format(epoch), draw_image, i + 1)
+
+			progressbar.update(1)
+
+		progressbar.close()
+
+	AUROCs_global = compute_AUCs(ground_truth, pred_global)
+	AUROCs_global_avg = np.array(AUROCs_global).mean()
+	AUROCs_local = compute_AUCs(ground_truth, pred_local)
+	AUROCs_local_avg = np.array(AUROCs_local).mean()
+	AUROCs_fusion = compute_AUCs(ground_truth, pred_fusion)
+	AUROCs_fusion_avg = np.array(AUROCs_fusion).mean()
+
+	if AUROCs_global_avg > best_AUCs['global']:
+		best_AUCs['global'] = AUROCs_global_avg
+		save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global.pth')
+		copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global_best.pth')
+		shutil.copyfile(save_name, copy_name)
+		print(" Global best model is saved: {}".format(copy_name))
+
+	if AUROCs_local_avg > best_AUCs['local']:
+		best_AUCs['local'] = AUROCs_local_avg
+		save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_local.pth')
+		copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_local_best.pth')
+		shutil.copyfile(save_name, copy_name)
+		print(" Local best model is saved: {}".format(copy_name))
+
+	if AUROCs_fusion_avg > best_AUCs['fusion']:
+		best_AUCs['fusion'] = AUROCs_fusion_avg
+		save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_fusion.pth')
+		copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_fusion_best.pth')
+		shutil.copyfile(save_name, copy_name)
+		print(" Fusion best model is saved: {}".format(copy_name))
+
+	write_csv(path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_AUROCs.csv'),
+						data = ['Global'] + list(AUROCs_global) + list(AUROCs_global_avg),
+						mode = 'a')
+	write_csv(path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_AUROCs.csv'),
+						data = ['Local'] + list(AUROCs_local) + list(AUROCs_local_avg),
+						mode = 'a')
+	write_csv(path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_AUROCs.csv'),
+						data = ['Fusion'] + list(AUROCs_fusion) + list(AUROCs_fusion_avg),
+						mode = 'a')
+
+	print("|===============================================================================================|")
+	print("|\t\t\t\t\t    AUROC\t\t\t\t\t\t|")
+	print("|===============================================================================================|")
+	print("|\t\t\t|  Global branch\t|  Local branch\t\t|  Fusion branch\t|")
+	print("|-----------------------------------------------------------------------------------------------|")
+	for i in range(len(classes_name)):
+		if len(classes_name[i]) < 6:
+			print("| {}\t\t\t|".format(classes_name[i]), end="")
+		elif len(classes_name[i]) > 14:
+			print("| {}\t|".format(classes_name[i]), end="")
+		else:
+			print("| {}\t\t|".format(classes_name[i]), end="")
+		print("  {:.10f}\t\t|  {:.10f}\t\t|  {:.10f}\t\t|".format(AUROCs_global[i], AUROCs_local[i], AUROCs_fusion[i]))
+	print("|-----------------------------------------------------------------------------------------------|")
+	print("| Average\t\t|  {:.10f}\t\t|  {:.10f}\t\t|  {:.10f}\t\t|".format(np.array(AUROCs_global).mean(), np.array(AUROCs_local).mean(), np.array(AUROCs_fusion).mean()))
+	print("|===============================================================================================|")
+	print()
+
+if __name__ == "__main__":
+	main()

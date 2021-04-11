@@ -1,5 +1,6 @@
 import os
 import cv2
+import csv
 import shutil
 import numpy as np
 from PIL import Image, ImageDraw
@@ -13,7 +14,6 @@ import torchvision.transforms as transforms
 
 def AttentionGenPatchs(ori_image, features_global, threshold = 0.7):
 
-	features_global = features_global.detach().cpu()
 	batch_size = features_global.shape[0]
 	n, c, h, w = ori_image.shape
 
@@ -23,9 +23,9 @@ def AttentionGenPatchs(ori_image, features_global, threshold = 0.7):
 	for b in range(batch_size):
 		heatmap = torch.abs(features_global[b])
 		heatmap = torch.max(heatmap, dim = 0)[0]
-		max1 = torch.max(heatmap)
-		min1 = torch.min(heatmap)
-		heatmap = (heatmap - min1) / (max1 - min1)
+		# max1 = torch.max(heatmap)
+		# min1 = torch.min(heatmap)
+		# heatmap = (heatmap - min1) / (max1 - min1)
 
 		heatmap = F.interpolate(heatmap.unsqueeze(0).unsqueeze(0), size=(h, w), mode = 'bilinear', align_corners = True)
 		heatmap = torch.squeeze(heatmap)
@@ -57,7 +57,7 @@ def selectMaxConnect(heatmap):
 			max_label = i
 	lcc = (labeled_img == max_label)
 	if max_num == 0:
-	   lcc = (labeled_img == -1)
+		lcc = (labeled_img == -1)
 	lcc = lcc + 0
 	return lcc 
 
@@ -115,8 +115,8 @@ def drawImage(images, labels, images_cropped, coordinates):
 	new_images = Image.new('RGB', (bz * w, 2 * h), (0, 0, 0))
 	
 	unnormalize = UnNormalize(
-	   mean=[0.485, 0.456, 0.406],
-	   std=[0.229, 0.224, 0.225]
+		mean=[0.485, 0.456, 0.406],
+		std=[0.229, 0.224, 0.225]
 	)
 
 	for i in range(bz):
@@ -135,3 +135,8 @@ def drawImage(images, labels, images_cropped, coordinates):
 
 	new_images = transforms.ToTensor()(new_images).unsqueeze(0)
 	return new_images
+
+def write_csv(filename, data, mode = 'a'):
+	with open(filename, mode = mode, newline = '') as file: 
+		writer = csv.writer(file)
+		writer.writerow(data)
