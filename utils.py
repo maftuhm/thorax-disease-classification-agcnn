@@ -9,7 +9,7 @@ from sklearn.metrics import roc_auc_score
 from skimage.measure import label
 
 import torch
-import torch.nn.funtional as F
+import torch.nn.functional as F
 import torchvision.transforms as transforms
 
 def AttentionGenPatchs(ori_image, features_global, threshold = 0.7):

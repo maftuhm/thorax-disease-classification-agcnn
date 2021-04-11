@@ -20,7 +20,7 @@ from utils import *
 def parse_args():
 	parser = argparse.ArgumentParser(description='AG-CNN')
 	parser.add_argument('--use', type=str, default='train', help='use for what (train or test)')
-	parser.add_argument("--exp_dir", type=str, default="./experiments/exp7")
+	parser.add_argument("--exp_dir", type=str, default="./experiments/exp8")
 	parser.add_argument("--resume", "-r", action="store_true")
 	args = parser.parse_args()
 	return args
@@ -150,7 +150,7 @@ def main():
 		mini_batch_loss = 0.
 
 		count = 0
-		batch_multiplier = 16
+		batch_multiplier = 32
 
 		progressbar = tqdm(range(len(train_loader)))
 
@@ -188,7 +188,7 @@ def main():
 			progressbar.set_description(" bacth loss: {loss:.3f} "
 										"loss1: {loss1:.3f} "
 										"loss2: {loss2:.3f} "
-										"loss3: {loss3:.3f}".format(loss = loss * batch_multiplier,
+										"loss3: {loss3:.3f}".format(loss = loss.data.item() * batch_multiplier,
 																	loss1 = global_loss.data.item(),
 																	loss2 = local_loss.data.item(),
 																	loss3 = fusion_loss.data.item()))
@@ -245,9 +245,9 @@ def main():
 											'fusion_loss': running_fusion_loss / float(i)}, epoch)
 		writer.flush()
 
-		test(GlobalModel, LocalModel, FusionModel, val_loader)
+		test(epoch, GlobalModel, LocalModel, FusionModel, val_loader)
 
-def test(GlobalModel, LocalModel, FusionModel, test_loader):
+def test(epoch, GlobalModel, LocalModel, FusionModel, test_loader):
 
 	GlobalModel.eval()
 	LocalModel.eval()
@@ -273,9 +273,9 @@ def test(GlobalModel, LocalModel, FusionModel, test_loader):
 			output_fusion = FusionModel(pool_global, pool_local)
 
 			ground_truth = torch.cat((ground_truth, target.detach()), 0)
-			pred_global = torch.cat((pred_global, output_global.data.item()), 0)
-			pred_local = torch.cat((pred_local, output_local.data.item()), 0)
-			pred_fusion = torch.cat((pred_fusion, output_fusion.data.item()), 0)
+			pred_global = torch.cat((pred_global.detach(), output_global.detach().cpu()), 0)
+			pred_local = torch.cat((pred_local.detach(), output_local.detach().cpu()), 0)
+			pred_fusion = torch.cat((pred_fusion.detach(), output_fusion.detach().cpu()), 0)
 
 			if (i + 1) % 300 == 0:
 				target_embedding = []
@@ -288,7 +288,7 @@ def test(GlobalModel, LocalModel, FusionModel, test_loader):
 
 					target_embedding.append(text_label)
 
-				draw_image = drawImage(image, target_embedding, image_patch.detach(), coordinates)
+				draw_image = drawImage(image.detach(), target_embedding, image_patch.detach(), coordinates)
 				writer.add_images("Train/epoch_{}".format(epoch), draw_image, i + 1)
 
 			progressbar.update(1)
@@ -324,13 +324,13 @@ def test(GlobalModel, LocalModel, FusionModel, test_loader):
 		print(" Fusion best model is saved: {}".format(copy_name))
 
 	write_csv(path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_AUROCs.csv'),
-						data = ['Global'] + list(AUROCs_global) + list(AUROCs_global_avg),
+						data = ['Global'] + list(AUROCs_global) + [AUROCs_global_avg],
 						mode = 'a')
 	write_csv(path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_AUROCs.csv'),
-						data = ['Local'] + list(AUROCs_local) + list(AUROCs_local_avg),
+						data = ['Local'] + list(AUROCs_local) + [AUROCs_local_avg],
 						mode = 'a')
 	write_csv(path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_AUROCs.csv'),
-						data = ['Fusion'] + list(AUROCs_fusion) + list(AUROCs_fusion_avg),
+						data = ['Fusion'] + list(AUROCs_fusion) + [AUROCs_fusion_avg],
 						mode = 'a')
 
 	print("|===============================================================================================|")
@@ -338,7 +338,13 @@ def test(GlobalModel, LocalModel, FusionModel, test_loader):
 	print("|===============================================================================================|")
 	print("|\t\t\t|  Global branch\t|  Local branch\t\t|  Fusion branch\t|")
 	print("|-----------------------------------------------------------------------------------------------|")
+	dict_AUROCs_global, dict_AUROCs_local, dict_AUROCs_fusion = {}, {}, {}
+
 	for i in range(len(classes_name)):
+		dict_AUROCs_global[classes_name[i]] = AUROCs_global[i]
+		dict_AUROCs_local[classes_name[i]] = AUROCs_local[i]
+		dict_AUROCs_fusion[classes_name[i]] = AUROCs_fusion[i]
+
 		if len(classes_name[i]) < 6:
 			print("| {}\t\t\t|".format(classes_name[i]), end="")
 		elif len(classes_name[i]) > 14:
@@ -347,9 +353,17 @@ def test(GlobalModel, LocalModel, FusionModel, test_loader):
 			print("| {}\t\t|".format(classes_name[i]), end="")
 		print("  {:.10f}\t\t|  {:.10f}\t\t|  {:.10f}\t\t|".format(AUROCs_global[i], AUROCs_local[i], AUROCs_fusion[i]))
 	print("|-----------------------------------------------------------------------------------------------|")
-	print("| Average\t\t|  {:.10f}\t\t|  {:.10f}\t\t|  {:.10f}\t\t|".format(np.array(AUROCs_global).mean(), np.array(AUROCs_local).mean(), np.array(AUROCs_fusion).mean()))
+	print("| Average\t\t|  {:.10f}\t\t|  {:.10f}\t\t|  {:.10f}\t\t|".format(AUROCs_global_avg, AUROCs_local_avg, AUROCs_fusion_avg))
 	print("|===============================================================================================|")
 	print()
+	writer.add_scalar("Val/AUROC", (AUROCs_global_avg + AUROCs_local_avg + AUROCs_fusion_avg) / 3, epoch)
+	writer.add_scalars("Val/AUROCs", {'AUROCs_global_avg': AUROCs_global_avg,
+										'AUROCs_local_avg': AUROCs_local_avg,
+										'AUROCs_fusion_avg': AUROCs_fusion_avg}, epoch)
+	writer.add_scalars("Val/AUROCs_global", dict_AUROCs_global, epoch)
+	writer.add_scalars("Val/AUROCs_global", dict_AUROCs_local, epoch)
+	writer.add_scalars("Val/AUROCs_global", dict_AUROCs_fusion, epoch)
+	writer.flush()
 
 if __name__ == "__main__":
 	main()
