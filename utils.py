@@ -12,6 +12,34 @@ import torch
 import torch.nn.functional as F
 import torchvision.transforms as transforms
 
+def L1(feature):
+	output = torch.abs(feature)
+	output = torch.sum(output, axis = 0) / feature.shape[0]
+	return output
+
+def L2(feature):
+	output = torch.sum(feature ** 2, axis = 0)
+	output = torch.sqrt(output) / feature.shape[0]
+	return output
+
+def Lmax(feature):
+	output = torch.abs(feature)
+	output = torch.max(output, dim = 0)[0]
+	return output
+
+def Lmax_normalize(feature):
+	output = Lmax(feature)
+	max1 = torch.max(output)
+	min1 = torch.min(output)
+	output = (output - min1) / (max1 - min1)
+	return output
+
+def L3(feature):
+	output = torch.sum(feature, axis = 0)
+	output = output - torch.min(output)
+	output = output / torch.max(output)
+	return output
+
 def AttentionGenPatchs(ori_image, features_global, threshold = 0.7):
 
 	batch_size = features_global.shape[0]
@@ -22,11 +50,7 @@ def AttentionGenPatchs(ori_image, features_global, threshold = 0.7):
 	coordinates = []
 
 	for b in range(batch_size):
-		heatmap = torch.abs(features_global[b])
-		heatmap = torch.max(heatmap, dim = 0)[0]
-		# max1 = torch.max(heatmap)
-		# min1 = torch.min(heatmap)
-		# heatmap = (heatmap - min1) / (max1 - min1)
+		heatmap = L1(features_global[b])
 
 		heatmap = F.interpolate(heatmap.unsqueeze(0).unsqueeze(0), size=(h, w), mode = 'bilinear', align_corners = True)
 		heatmap = torch.squeeze(heatmap)
