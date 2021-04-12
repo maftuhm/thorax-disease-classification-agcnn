@@ -170,7 +170,7 @@ def main():
 			# compute output
 			output_global, fm_global, pool_global = GlobalModel(image.to(device))
 			
-			image_patch, coordinates = AttentionGenPatchs(image.detach(), fm_global.detach().cpu())
+			image_patch, heatmaps, coordinates = AttentionGenPatchs(image.detach(), fm_global.detach().cpu())
 
 			output_local, _, pool_local = LocalModel(image_patch.to(device))
 
@@ -181,7 +181,7 @@ def main():
 			local_loss = criterion(output_local, target.to(device))
 			fusion_loss = criterion(output_fusion, target.to(device))
 
-			loss = (0.8 * global_loss + 0.1 * local_loss + 0.1 * fusion_loss) / batch_multiplier
+			loss = (global_loss + local_loss + fusion_loss) / batch_multiplier
 			loss.backward()
 			count -= 1
 			
@@ -204,7 +204,7 @@ def main():
 
 					target_embedding.append(text_label)
 
-				draw_image = drawImage(image, target_embedding, image_patch.detach(), coordinates)
+				draw_image = drawImage(image, target_embedding, image_patch.detach(), heatmaps, coordinates)
 				writer.add_images("Train/epoch_{}".format(epoch), draw_image, i + 1)
 
 			progressbar.update(1)
@@ -266,7 +266,7 @@ def test(epoch, GlobalModel, LocalModel, FusionModel, test_loader):
 			# compute output
 			output_global, fm_global, pool_global = GlobalModel(image.to(device))
 			
-			image_patch, coordinates = AttentionGenPatchs(image.detach(), fm_global.detach().cpu())
+			image_patch, heatmaps, coordinates = AttentionGenPatchs(image.detach(), fm_global.detach().cpu())
 
 			output_local, _, pool_local = LocalModel(image_patch.to(device))
 
@@ -277,7 +277,7 @@ def test(epoch, GlobalModel, LocalModel, FusionModel, test_loader):
 			pred_local = torch.cat((pred_local.detach(), output_local.detach().cpu()), 0)
 			pred_fusion = torch.cat((pred_fusion.detach(), output_fusion.detach().cpu()), 0)
 
-			if (i + 1) % 300 == 0:
+			if (i + 1) % 150 == 0:
 				target_embedding = []
 				for label in target:
 					text_label = [classes_name[i] for i, a in enumerate(label) if a != 0]
@@ -288,8 +288,8 @@ def test(epoch, GlobalModel, LocalModel, FusionModel, test_loader):
 
 					target_embedding.append(text_label)
 
-				draw_image = drawImage(image.detach(), target_embedding, image_patch.detach(), coordinates)
-				writer.add_images("Train/epoch_{}".format(epoch), draw_image, i + 1)
+				draw_image = drawImage(image.detach(), target_embedding, image_patch.detach(), heatmaps, coordinates)
+				writer.add_images("Val/epoch_{}".format(epoch), draw_image, i + 1)
 
 			progressbar.update(1)
 
@@ -361,8 +361,8 @@ def test(epoch, GlobalModel, LocalModel, FusionModel, test_loader):
 										'AUROCs_local_avg': AUROCs_local_avg,
 										'AUROCs_fusion_avg': AUROCs_fusion_avg}, epoch)
 	writer.add_scalars("Val/AUROCs_global", dict_AUROCs_global, epoch)
-	writer.add_scalars("Val/AUROCs_global", dict_AUROCs_local, epoch)
-	writer.add_scalars("Val/AUROCs_global", dict_AUROCs_fusion, epoch)
+	writer.add_scalars("Val/AUROCs_local", dict_AUROCs_local, epoch)
+	writer.add_scalars("Val/AUROCs_fusion", dict_AUROCs_fusion, epoch)
 	writer.flush()
 
 if __name__ == "__main__":

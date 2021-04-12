@@ -18,6 +18,7 @@ def AttentionGenPatchs(ori_image, features_global, threshold = 0.7):
 	n, c, h, w = ori_image.shape
 
 	cropped_image = torch.zeros(batch_size, c, w, h, dtype=ori_image.dtype)
+	heatmaps = torch.zeros(batch_size, c, w, h, dtype=ori_image.dtype)
 	coordinates = []
 
 	for b in range(batch_size):
@@ -29,6 +30,7 @@ def AttentionGenPatchs(ori_image, features_global, threshold = 0.7):
 
 		heatmap = F.interpolate(heatmap.unsqueeze(0).unsqueeze(0), size=(h, w), mode = 'bilinear', align_corners = True)
 		heatmap = torch.squeeze(heatmap)
+		heatmaps[b] = heatmap
 		heatmap[heatmap > threshold] = 1
 		heatmap[heatmap != 1] = 0
 
@@ -44,7 +46,7 @@ def AttentionGenPatchs(ori_image, features_global, threshold = 0.7):
 		cropped_image[b] = F.interpolate(img_crop.unsqueeze(0), size=(h, w), mode = 'bilinear', align_corners = True).squeeze(0)
 		coordinates.append((xmin, ymin, xmax, ymax))
 
-	return cropped_image, coordinates
+	return cropped_image, heatmaps, coordinates
 
 
 def selectMaxConnect(heatmap):
@@ -109,10 +111,10 @@ class UnNormalize(object):
 			# The normalize code -> t.sub_(m).div_(s)
 		return tensor
 
-def drawImage(images, labels, images_cropped, coordinates):
+def drawImage(images, labels, images_cropped, heatmaps, coordinates):
 	bz, c, h, w = images.shape # batch_size, channel, height, width
 
-	new_images = Image.new('RGB', (bz * w, 2 * h), (0, 0, 0))
+	new_images = Image.new('RGB', (bz * w, 3 * h), (0, 0, 0))
 	
 	unnormalize = UnNormalize(
 		mean=[0.485, 0.456, 0.406],
@@ -123,6 +125,8 @@ def drawImage(images, labels, images_cropped, coordinates):
 		img = unnormalize(images[i])
 		img = transforms.ToPILImage()(img)
 
+		heatmap = transforms.ToPILImage()(heatmaps[i])
+
 		img_patch = unnormalize(images_cropped[i])
 		img_patch = transforms.ToPILImage()(img_patch)
 
@@ -131,7 +135,8 @@ def drawImage(images, labels, images_cropped, coordinates):
 		draw_img.text((coordinates[i][0] + 5, coordinates[i][1] + 5), str(labels[i]), (0, 255, 0))
 
 		new_images.paste(img, (i * w, 0))
-		new_images.paste(img_patch, (i * w, w))
+		new_images.paste(heatmap, (i * w, w))
+		new_images.paste(img_patch, (i * w, w + w))
 
 	new_images = transforms.ToTensor()(new_images).unsqueeze(0)
 	return new_images
