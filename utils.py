@@ -12,6 +12,9 @@ import torch
 import torch.nn.functional as F
 import torchvision.transforms as transforms
 
+CLASS_NAMES = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass', 'Nodule', 'Pneumonia',
+				'Pneumothorax', 'Consolidation', 'Edema', 'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia']
+
 def L1(feature):
 	output = torch.abs(feature)
 	output = torch.sum(output, axis = 0) / feature.shape[0]
@@ -50,7 +53,7 @@ def AttentionGenPatchs(ori_image, features_global, threshold = 0.7):
 	coordinates = []
 
 	for b in range(batch_size):
-		heatmap = L1(features_global[b])
+		heatmap = L3(features_global[b])
 
 		heatmap = F.interpolate(heatmap.unsqueeze(0).unsqueeze(0), size=(h, w), mode = 'bilinear', align_corners = True)
 		heatmap = torch.squeeze(heatmap)
@@ -135,10 +138,10 @@ class UnNormalize(object):
 			# The normalize code -> t.sub_(m).div_(s)
 		return tensor
 
-def drawImage(images, labels, images_cropped, heatmaps, coordinates):
+def drawImage(images, target, scores, images_cropped, heatmaps, coordinates):
 	bz, c, h, w = images.shape # batch_size, channel, height, width
 
-	new_images = Image.new('RGB', (bz * w, 3 * h), (0, 0, 0))
+	new_images = Image.new('RGB', (bz * w, 4 * h), (255, 255, 255))
 	
 	unnormalize = UnNormalize(
 		mean=[0.485, 0.456, 0.406],
@@ -156,11 +159,26 @@ def drawImage(images, labels, images_cropped, heatmaps, coordinates):
 
 		draw_img = ImageDraw.Draw(img)
 		draw_img.rectangle(coordinates[i], outline=(0, 255, 0))
-		draw_img.text((coordinates[i][0] + 5, coordinates[i][1] + 5), str(labels[i]), (0, 255, 0))
+		# draw_img.text((coordinates[i][0] + 5, coordinates[i][1] + 5), str(labels[i]), (0, 255, 0))
 
 		new_images.paste(img, (i * w, 0))
 		new_images.paste(heatmap, (i * w, w))
-		new_images.paste(img_patch, (i * w, w + w))
+		new_images.paste(img_patch, (i * w, w * 2))
+
+		draw_img = ImageDraw.Draw(new_images)
+		draw_img.rectangle((i * w, 2 * h, (i + 1) * w, 4 * h), outline=(0, 0, 0))
+
+		ground_truth_text = [CLASS_NAMES[ind_t] for ind_t, a in enumerate(target[i]) if a != 0]
+		predicted_text = [(a, b) for a, b in zip(CLASS_NAMES, scores[i].tolist())]
+		predicted_text = sorted(predicted_text, key=lambda x: x[1], reverse=True)
+
+		for j, (text, score) in enumerate(predicted_text):
+			if text in ground_truth_text:
+				fill = (0, 0, 255)
+			else:
+				fill = (0, 0, 0)
+			draw_img.text((i * w + 15, w * 3 + j * 15 + 10), text, fill = fill)
+			draw_img.text((i * w + 150, w * 3 + j * 15 + 10), str(score)[:10], fill = fill)
 
 	new_images = transforms.ToTensor()(new_images).unsqueeze(0)
 	return new_images

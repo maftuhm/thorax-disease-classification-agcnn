@@ -20,7 +20,7 @@ from utils import *
 def parse_args():
 	parser = argparse.ArgumentParser(description='AG-CNN')
 	parser.add_argument('--use', type=str, default='train', help='use for what (train or test)')
-	parser.add_argument("--exp_dir", type=str, default="./experiments/exp8")
+	parser.add_argument("--exp_dir", type=str, default="./experiments/exp9")
 	parser.add_argument("--resume", "-r", action="store_true")
 	args = parser.parse_args()
 	return args
@@ -39,9 +39,9 @@ classes_name = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mas
 max_batch_capacity = 8
 
 best_AUCs = {
-	'global': -1000,
-	'local': -1000,
-	'fusion': -1000
+	'global': 0.8256,
+	'local': 0.7936,
+	'fusion': 0.8223
 }
 
 cudnn.benchmark = True
@@ -194,17 +194,7 @@ def main():
 																	loss3 = fusion_loss.data.item()))
 
 			if (i + 1) % 1000 == 0:
-				target_embedding = []
-				for label in target:
-					text_label = [classes_name[i] for i, a in enumerate(label) if a != 0]
-					text_label = '|'.join(text_label)
-
-					if len(text_label) == 0:
-					    text_label = 'No Finding'
-
-					target_embedding.append(text_label)
-
-				draw_image = drawImage(image, target_embedding, image_patch.detach(), heatmaps, coordinates)
+				draw_image = drawImage(image, target, output_fusion.detach().cpu(), image_patch.detach(), heatmaps, coordinates)
 				writer.add_images("Train/epoch_{}".format(epoch), draw_image, i + 1)
 
 			progressbar.update(1)
@@ -278,17 +268,7 @@ def test(epoch, GlobalModel, LocalModel, FusionModel, test_loader):
 			pred_fusion = torch.cat((pred_fusion.detach(), output_fusion.detach().cpu()), 0)
 
 			if (i + 1) % 150 == 0:
-				target_embedding = []
-				for label in target:
-					text_label = [classes_name[i] for i, a in enumerate(label) if a != 0]
-					text_label = '|'.join(text_label)
-
-					if len(text_label) == 0:
-					    text_label = 'No Finding'
-
-					target_embedding.append(text_label)
-
-				draw_image = drawImage(image.detach(), target_embedding, image_patch.detach(), heatmaps, coordinates)
+				draw_image = drawImage(image, target, output_fusion.detach().cpu(), image_patch.detach(), heatmaps, coordinates)
 				writer.add_images("Val/epoch_{}".format(epoch), draw_image, i + 1)
 
 			progressbar.update(1)
