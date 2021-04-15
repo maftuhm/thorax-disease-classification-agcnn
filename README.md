@@ -1,5 +1,5 @@
-# skripsi
-
+# AG-CNN Method
+------
 ![method](https://github.com/Ien001/AG-CNN/blob/master/Screen%20Shot%202019-04-03%20at%2011.45.38%20AM.png)
 
 ## parameters
@@ -31,3 +31,7 @@
 	"backbone" : "resnet50"
 }
 ```
+## Result
+------
+![result best epoch model](https://github.com/maftuhm/lung-desease-detection-agcnn/screenshot/blob/master/exp9_best_epoch_model_result.png)
+![result last epoch model](https://github.com/maftuhm/lung-desease-detection-agcnn/screenshot/blob/master/exp9_last_epoch_model_result.png)

@@ -20,6 +20,7 @@ from utils import *
 def parse_args():
 	parser = argparse.ArgumentParser(description='AG-CNN')
 	parser.add_argument("--exp_dir", type=str, default="./experiments/exp9")
+	parser.add_argument("--best_model", "-b", action="store_true")
 	args = parser.parse_args()
 	return args
 
@@ -56,34 +57,39 @@ def main():
 
 	# ================= LOAD DATASET ================= #
 	val_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'val', transform = transform_test)
-	val_loader = DataLoader(dataset = val_dataset, batch_size = 32, shuffle = False, num_workers = 4)
+	val_loader = DataLoader(dataset = val_dataset, batch_size = 32, shuffle = False, num_workers = 4, pin_memory = True)
 
 	test_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'test', transform = transform_test)
-	test_loader = DataLoader(dataset = test_dataset, batch_size = 32, shuffle = False, num_workers = 4)
+	test_loader = DataLoader(dataset = test_dataset, batch_size = 32, shuffle = False, num_workers = 4, pin_memory = True)
 
 	# ================= MODELS ================= #
 	GlobalModel = Net(exp_cfg['backbone']).to(device)
 	LocalModel = Net(exp_cfg['backbone']).to(device)
 	FusionModel = FusionNet(exp_cfg['backbone']).to(device)
 
-	checkpoint_global = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global_best.pth')
-	checkpoint_local = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_local_best.pth')
-	checkpoint_fusion = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_fusion_best.pth')
+	if args.best_model:
+		add_text = '_best'
+	else:
+		add_text = ''
+
+	checkpoint_global = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global' + add_text + '.pth')
+	checkpoint_local = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_local' + add_text + '.pth')
+	checkpoint_fusion = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_fusion' + add_text + '.pth')
 
 	if path.isfile(checkpoint_global):
 		save_dict = torch.load(checkpoint_global)
 		GlobalModel.load_state_dict(save_dict['net'])
-		print(" Loaded Global Branch Model checkpoint")
+		print(" Loaded Global Branch Model checkpoint from epoch", save_dict['epoch'])
 
 	if path.isfile(checkpoint_local):
 		save_dict = torch.load(checkpoint_local)
 		LocalModel.load_state_dict(save_dict['net'])
-		print(" Loaded Local Branch Model checkpoint")
+		print(" Loaded Local Branch Model checkpoint from epoch", save_dict['epoch'])
 
 	if path.isfile(checkpoint_fusion):
 		save_dict = torch.load(checkpoint_fusion)
 		FusionModel.load_state_dict(save_dict['net'])
-		print(" Loaded Fusion Branch Model checkpoint")
+		print(" Loaded Fusion Branch Model checkpoint from epoch", save_dict['epoch'])
 
 	write_csv(path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_AUROCs.csv'),
 						data = ['Model'] + classes_name + ['Mean'],
@@ -160,7 +166,6 @@ def main():
 	print("| Average\t\t|  {:.10f}\t\t|  {:.10f}\t\t|  {:.10f}\t\t|".format(AUROCs_global_avg, AUROCs_local_avg, AUROCs_fusion_avg))
 	print("|===============================================================================================|")
 	print()
-	writer.flush()
 
 if __name__ == "__main__":
 	main()
