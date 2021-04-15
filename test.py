@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 import torch.backends.cudnn as cudnn
 
 import torchvision.transforms as transforms
@@ -19,7 +19,7 @@ from utils import *
 
 def parse_args():
 	parser = argparse.ArgumentParser(description='AG-CNN')
-	parser.add_argument("--exp_dir", type=str, default="./experiments/exp10")
+	parser.add_argument("--exp_dir", type=str, default="./experiments/exp9")
 	args = parser.parse_args()
 	return args
 
@@ -36,15 +36,9 @@ classes_name = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mas
 
 max_batch_capacity = 4
 
-best_AUCs = {
-	'global': -1000,
-	'local': -1000,
-	'fusion': -1000
-}
-
 cudnn.benchmark = True
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-writer = SummaryWriter(args.exp_dir + '/log')
+# writer = SummaryWriter(args.exp_dir + '/log')
 
 def main():
 	# ================= TRANSFORMS ================= #
@@ -71,19 +65,6 @@ def main():
 	GlobalModel = Net(exp_cfg['backbone']).to(device)
 	LocalModel = Net(exp_cfg['backbone']).to(device)
 	FusionModel = FusionNet(exp_cfg['backbone']).to(device)
-
-	# ================= OPTIMIZER ================= #
-	optimizer_global = optim.SGD(GlobalModel.parameters(), **exp_cfg['optimizer']['SGD'])
-	optimizer_local = optim.SGD(LocalModel.parameters(), **exp_cfg['optimizer']['SGD'])
-	optimizer_fusion = optim.SGD(FusionModel.parameters(), **exp_cfg['optimizer']['SGD'])
-
-	# ================= SCHEDULER ================= #
-	lr_scheduler_global = optim.lr_scheduler.StepLR(optimizer_global , **exp_cfg['lr_scheduler'])
-	lr_scheduler_local = optim.lr_scheduler.StepLR(optimizer_local , **exp_cfg['lr_scheduler'])
-	lr_scheduler_fusion = optim.lr_scheduler.StepLR(optimizer_fusion , **exp_cfg['lr_scheduler'])
-
-	# ================= LOSS FUNCTION ================= #
-	criterion = nn.BCELoss()
 
 	checkpoint_global = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global_best.pth')
 	checkpoint_local = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_local_best.pth')
@@ -136,9 +117,9 @@ def main():
 			pred_local = torch.cat((pred_local.detach(), output_local.detach().cpu()), 0)
 			pred_fusion = torch.cat((pred_fusion.detach(), output_fusion.detach().cpu()), 0)
 
-			if (i + 1) % 300 == 0:
-				draw_image = drawImage(image, target, output_fusion.detach().cpu(), image_patch.detach(), heatmaps, coordinates)
-				writer.add_images("Val/epoch_{}".format(epoch), draw_image, i + 1)
+			# if (i + 1) % 300 == 0:
+			# 	draw_image = drawImage(image, target, output_fusion.detach().cpu(), image_patch.detach(), heatmaps, coordinates)
+			# 	writer.add_images("Val/epoch_{}".format(epoch), draw_image, i + 1)
 
 			progressbar.update(1)
 
@@ -151,27 +132,6 @@ def main():
 	AUROCs_fusion = compute_AUCs(ground_truth, pred_fusion)
 	AUROCs_fusion_avg = np.array(AUROCs_fusion).mean()
 
-	if AUROCs_global_avg > best_AUCs['global']:
-		best_AUCs['global'] = AUROCs_global_avg
-		save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global.pth')
-		copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global_best.pth')
-		shutil.copyfile(save_name, copy_name)
-		print(" Global best model is saved: {}".format(copy_name))
-
-	if AUROCs_local_avg > best_AUCs['local']:
-		best_AUCs['local'] = AUROCs_local_avg
-		save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_local.pth')
-		copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_local_best.pth')
-		shutil.copyfile(save_name, copy_name)
-		print(" Local best model is saved: {}".format(copy_name))
-
-	if AUROCs_fusion_avg > best_AUCs['fusion']:
-		best_AUCs['fusion'] = AUROCs_fusion_avg
-		save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_fusion.pth')
-		copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_fusion_best.pth')
-		shutil.copyfile(save_name, copy_name)
-		print(" Fusion best model is saved: {}".format(copy_name))
-
 	write_csv(path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_AUROCs.csv'),
 						data = ['Global'] + list(AUROCs_global) + [AUROCs_global_avg],
 						mode = 'a')
@@ -181,8 +141,6 @@ def main():
 	write_csv(path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_AUROCs.csv'),
 						data = ['Fusion'] + list(AUROCs_fusion) + [AUROCs_fusion_avg],
 						mode = 'a')
-
-	print(' Best AUROCs global: {:.5f} | local: {:.5f} | fusion: {:.5f}'.format(best_AUCs['global'], best_AUCs['local'], best_AUCs['fusion']))
 
 	print("|===============================================================================================|")
 	print("|\t\t\t\t\t    AUROC\t\t\t\t\t\t|")
