@@ -20,7 +20,7 @@ from utils import *
 def parse_args():
 	parser = argparse.ArgumentParser(description='AG-CNN')
 	parser.add_argument('--use', type=str, default='train', help='use for what (train or test)')
-	parser.add_argument("--exp_dir", type=str, default="./experiments/exp9")
+	parser.add_argument("--exp_dir", type=str, default="./experiments/exp10")
 	parser.add_argument("--resume", "-r", action="store_true")
 	args = parser.parse_args()
 	return args
@@ -36,12 +36,12 @@ data_dir = path.join('..', 'lung-disease-detection', 'data')
 classes_name = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass', 'Nodule', 'Pneumonia',
 				'Pneumothorax', 'Consolidation', 'Edema', 'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia']
 
-max_batch_capacity = 8
+max_batch_capacity = 4
 
 best_AUCs = {
-	'global': 0.8256,
-	'local': 0.7936,
-	'fusion': 0.8223
+	'global': -1000,
+	'local': -1000,
+	'fusion': -1000
 }
 
 cudnn.benchmark = True
@@ -193,7 +193,7 @@ def main():
 																	loss2 = local_loss.data.item(),
 																	loss3 = fusion_loss.data.item()))
 
-			if (i + 1) % 1000 == 0:
+			if (i + 1) % 5000 == 0:
 				draw_image = drawImage(image, target, output_fusion.detach().cpu(), image_patch.detach(), heatmaps, coordinates)
 				writer.add_images("Train/epoch_{}".format(epoch), draw_image, i + 1)
 
@@ -267,7 +267,7 @@ def test(epoch, GlobalModel, LocalModel, FusionModel, test_loader):
 			pred_local = torch.cat((pred_local.detach(), output_local.detach().cpu()), 0)
 			pred_fusion = torch.cat((pred_fusion.detach(), output_fusion.detach().cpu()), 0)
 
-			if (i + 1) % 150 == 0:
+			if (i + 1) % 300 == 0:
 				draw_image = drawImage(image, target, output_fusion.detach().cpu(), image_patch.detach(), heatmaps, coordinates)
 				writer.add_images("Val/epoch_{}".format(epoch), draw_image, i + 1)
 
@@ -312,6 +312,8 @@ def test(epoch, GlobalModel, LocalModel, FusionModel, test_loader):
 	write_csv(path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_AUROCs.csv'),
 						data = ['Fusion'] + list(AUROCs_fusion) + [AUROCs_fusion_avg],
 						mode = 'a')
+
+	print(' Best AUROCs global: {:.5f} | local: {:.5f} | fusion: {:.5f}'.format(best_AUCs['global'], best_AUCs['local'], best_AUCs['fusion']))
 
 	print("|===============================================================================================|")
 	print("|\t\t\t\t\t    AUROC\t\t\t\t\t\t|")
