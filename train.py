@@ -14,7 +14,7 @@ import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 
 from read_data import ChestXrayDataSet
-from model import Net, FusionNet
+from model import Net, FusionNet, WeightedBCELoss
 from utils import *
 
 def parse_args():
@@ -96,7 +96,7 @@ def main():
 	lr_scheduler_fusion = optim.lr_scheduler.StepLR(optimizer_fusion , **exp_cfg['lr_scheduler'])
 
 	# ================= LOSS FUNCTION ================= #
-	criterion = nn.BCELoss()
+	criterion = WeightedBCELoss(PosNegWeightIsDynamic = True)
 
 	if args.resume:
 		start_epoch = 0
