@@ -39,9 +39,9 @@ classes_name = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mas
 max_batch_capacity = 8
 
 best_AUCs = {
-	'global': -1000,
-	'local': -1000,
-	'fusion': -1000
+	'global': 0.84237,
+	'local': 0.82683,
+	'fusion': 0.84389
 }
 
 cudnn.benchmark = True
@@ -108,24 +108,24 @@ def main():
 			save_dict = torch.load(checkpoint_global)
 			start_epoch = max(save_dict['epoch'], start_epoch)
 			GlobalModel.load_state_dict(save_dict['net'])
-			# optimizer_global.load_state_dict(save_dict['optim'])
-			# lr_scheduler_global.load_state_dict(save_dict['lr_scheduler'])
+			optimizer_global.load_state_dict(save_dict['optim'])
+			lr_scheduler_global.load_state_dict(save_dict['lr_scheduler'])
 			print(" Loaded Global Branch Model checkpoint")
 
 		if path.isfile(checkpoint_local):
 			save_dict = torch.load(checkpoint_local)
 			start_epoch = max(save_dict['epoch'], start_epoch)
 			LocalModel.load_state_dict(save_dict['net'])
-			# optimizer_local.load_state_dict(save_dict['optim'])
-			# lr_scheduler_local.load_state_dict(save_dict['lr_scheduler'])
+			optimizer_local.load_state_dict(save_dict['optim'])
+			lr_scheduler_local.load_state_dict(save_dict['lr_scheduler'])
 			print(" Loaded Local Branch Model checkpoint")
 
 		if path.isfile(checkpoint_fusion):
 			save_dict = torch.load(checkpoint_fusion)
 			start_epoch = max(save_dict['epoch'], start_epoch)
 			FusionModel.load_state_dict(save_dict['net'])
-			# optimizer_fusion.load_state_dict(save_dict['optim'])
-			# lr_scheduler_fusion.load_state_dict(save_dict['lr_scheduler'])
+			optimizer_fusion.load_state_dict(save_dict['optim'])
+			lr_scheduler_fusion.load_state_dict(save_dict['lr_scheduler'])
 			print(" Loaded Fusion Branch Model checkpoint")
 
 		start_epoch += 1
