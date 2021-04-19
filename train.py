@@ -143,30 +143,24 @@ def main():
 		GlobalModel.train()
 		LocalModel.train()
 		FusionModel.train()
-		
+
+		optimizer_global.zero_grad()
+		optimizer_local.zero_grad()
+		optimizer_fusion.zero_grad()
+
 		running_loss = 0.
 		running_global_loss = 0.
 		running_local_loss = 0.
 		running_fusion_loss = 0.
 		mini_batch_loss = 0.
 
-		count = 0
 		batch_multiplier = 32
 
 		progressbar = tqdm(range(len(train_loader)))
 
+		# torch.autograd.set_detect_anomaly(True)
+		
 		for i, (image, target) in enumerate(train_loader):
-
-			if count == 0:
-				optimizer_global.step()
-				optimizer_local.step()
-				optimizer_fusion.step()
-
-				optimizer_global.zero_grad()
-				optimizer_local.zero_grad()
-				optimizer_fusion.zero_grad()
-
-				count = batch_multiplier
 
 			# compute output
 			output_global, fm_global, pool_global = GlobalModel(image.to(device))
@@ -184,7 +178,15 @@ def main():
 
 			loss = (global_loss + local_loss + fusion_loss) / batch_multiplier
 			loss.backward()
-			count -= 1
+
+			if (i + 1) % batch_multiplier == 0:
+				optimizer_global.step()
+				optimizer_local.step()
+				optimizer_fusion.step()
+
+				optimizer_global.zero_grad()
+				optimizer_local.zero_grad()
+				optimizer_fusion.zero_grad()
 			
 			progressbar.set_description(" bacth loss: {loss:.3f} "
 										"loss1: {loss1:.3f} "
