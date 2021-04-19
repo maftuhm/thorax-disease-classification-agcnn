@@ -91,9 +91,9 @@ def main():
 	optimizer_fusion = optim.SGD(FusionModel.parameters(), **exp_cfg['optimizer']['SGD'])
 
 	# ================= SCHEDULER ================= #
-	lr_scheduler_global = optim.lr_scheduler.StepLR(optimizer_global , **exp_cfg['lr_scheduler'])
-	lr_scheduler_local = optim.lr_scheduler.StepLR(optimizer_local , **exp_cfg['lr_scheduler'])
-	lr_scheduler_fusion = optim.lr_scheduler.StepLR(optimizer_fusion , **exp_cfg['lr_scheduler'])
+	lr_scheduler_global = optim.lr_scheduler.ReduceLROnPlateau(optimizer_global , **exp_cfg['lr_scheduler'])
+	lr_scheduler_local = optim.lr_scheduler.ReduceLROnPlateau(optimizer_local , **exp_cfg['lr_scheduler'])
+	lr_scheduler_fusion = optim.lr_scheduler.ReduceLROnPlateau(optimizer_fusion , **exp_cfg['lr_scheduler'])
 
 	# ================= LOSS FUNCTION ================= #
 	criterion = WeightedBCELoss(PosNegWeightIsDynamic = True)
@@ -204,11 +204,15 @@ def main():
 			running_local_loss += local_loss.data.item()
 			running_fusion_loss += fusion_loss.data.item()
 
+			lr_global = optimizer_global.param_groups[0]['lr']
+			lr_local = optimizer_local.param_groups[0]['lr']
+			lr_fusion = optimizer_fusion.param_groups[0]['lr']
+
 		progressbar.close()
 
-		lr_scheduler_global.step()
-		lr_scheduler_local.step()
-		lr_scheduler_fusion.step()
+		lr_scheduler_global.step(running_global_loss / float(i))
+		lr_scheduler_local.step(running_local_loss / float(i))
+		lr_scheduler_fusion.step(running_fusion_loss / float(i))
 
 		# SAVE MODEL
 		save_model(args.exp_dir, epoch,
@@ -233,6 +237,10 @@ def main():
 		writer.add_scalars("Train/losses", {'global_loss': running_global_loss / float(i),
 											'local_loss': running_local_loss / float(i),
 											'fusion_loss': running_fusion_loss / float(i)}, epoch)
+		writer.add_scalar("Train/learning_rate", {'lr_global': lr_global,
+													'lr_local': lr_local,
+													'lr_fusion': lr_fusion}, epoch)
+
 		writer.flush()
 
 		test(epoch, GlobalModel, LocalModel, FusionModel, val_loader)

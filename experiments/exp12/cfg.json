@@ -1,0 +1,32 @@
+{
+	"NUM_EPOCH" : 60,
+	"dataset" : {
+		"resize" : [256, 256],
+		"crop" : [224, 224]
+	},
+	"batch_size" : {
+		"global" : 128,
+		"local" : 128,
+		"fusion" : 128
+	},
+	"optimizer" : {
+		"SGD" : {
+			"lr" : 0.01,
+			"momentum" : 0.9,
+			"weight_decay" : 0.0001
+		}
+	},
+	"lr_scheduler" : {
+		"mode" : "min",
+		"factor" : 0.1,
+		"patience" : 10,
+		"threshold" : 0.0001,
+		"threshold_mode" : "rel",
+		"cooldown" : 0,
+		"min_lr" : 0,
+		"eps" : 1e-06,
+		"verbose" : true
+	},
+	"threshold" : 0.7,
+	"backbone" : "resnet50"
+}

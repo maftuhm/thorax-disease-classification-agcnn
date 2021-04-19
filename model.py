@@ -19,14 +19,14 @@ class Net(nn.Module):
             num_features = backbone.classifier.in_features
 
     
-        self.maxpool = nn.MaxPool2d(kernel_size = 7, stride = 1)
+        self.pool = nn.LSEPool2d()
         self.fc = nn.Sequential(
             nn.Linear(num_features, 14),
             nn.Sigmoid())
 
     def forward(self, x):
         features = self.features(x)
-        pool = self.maxpool(features)
+        pool = self.pool(features)
         out_after_pooling = pool.view(pool.size(0), -1)
         out = self.fc(out_after_pooling)
         return out, features, out_after_pooling
@@ -49,6 +49,19 @@ class FusionNet(nn.Module):
         out = self.fc(fusion)
         out = self.sigmoid(out)
         return out
+
+class LSEPool2d(nn.Module):
+    def __init__(self, r = 10):
+        super(LSEPool2d, self).__init__()
+        self.r = r
+        self.maxpool = nn.MaxPool2d(kernel_size = 7, stride = 1)
+
+    def forward(self, x):
+        xmaxpool = torch.abs(x)
+        xmaxpool = self.maxpool(xmaxpool)
+        xpool = (1 / (x.shape[-1] * x.shape[-2])) * torch.sum(torch.exp(self.r * (x - xmaxpool)), dim = (-2, -1))
+        xpool  = xmaxpool + (1 / self.r) * torch.log(xpool).unsqueeze(-1).unsqueeze(-1)
+        return xpool
 
 def weighted_binary_cross_entropy(sigmoid_x, targets, pos_weight, neg_weight, weight=None, size_average=True, reduce=True):
     """
