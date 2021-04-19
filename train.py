@@ -234,9 +234,9 @@ def main():
 		writer.add_scalars("Train/losses", {'global_loss': running_global_loss / float(i),
 											'local_loss': running_local_loss / float(i),
 											'fusion_loss': running_fusion_loss / float(i)}, epoch)
-		writer.add_scalar("Train/learning_rate", {'lr_global': lr_scheduler_global.get_last_lr(),
-													'lr_local': lr_scheduler_local.get_last_lr(),
-													'lr_fusion': lr_scheduler_fusion.get_last_lr()}, epoch)
+		writer.add_scalar("Train/learning_rate", {'lr_global': optimizer_global.param_groups[0]['lr'],
+													'lr_local': optimizer_local.param_groups[0]['lr'],
+													'lr_fusion': optimizer_fusion.param_groups[0]['lr']}, epoch)
 
 		writer.flush()
 
