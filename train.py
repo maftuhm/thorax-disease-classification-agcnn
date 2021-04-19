@@ -20,7 +20,7 @@ from utils import *
 def parse_args():
 	parser = argparse.ArgumentParser(description='AG-CNN')
 	parser.add_argument('--use', type=str, default='train', help='use for what (train or test)')
-	parser.add_argument("--exp_dir", type=str, default="./experiments/exp11")
+	parser.add_argument("--exp_dir", type=str, default="./experiments/exp12")
 	parser.add_argument("--resume", "-r", action="store_true")
 	args = parser.parse_args()
 	return args
@@ -39,9 +39,9 @@ classes_name = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mas
 max_batch_capacity = 8
 
 best_AUCs = {
-	'global': 0.84237,
-	'local': 0.82683,
-	'fusion': 0.84389
+	'global': -1000,
+	'local': -1000,
+	'fusion': -1000
 }
 
 cudnn.benchmark = True
@@ -96,6 +96,7 @@ def main():
 	lr_scheduler_fusion = optim.lr_scheduler.ReduceLROnPlateau(optimizer_fusion , **exp_cfg['lr_scheduler'])
 
 	# ================= LOSS FUNCTION ================= #
+	# criterion = nn.BCELoss()
 	criterion = WeightedBCELoss(PosNegWeightIsDynamic = True)
 
 	if args.resume:
@@ -204,10 +205,6 @@ def main():
 			running_local_loss += local_loss.data.item()
 			running_fusion_loss += fusion_loss.data.item()
 
-			lr_global = optimizer_global.param_groups[0]['lr']
-			lr_local = optimizer_local.param_groups[0]['lr']
-			lr_fusion = optimizer_fusion.param_groups[0]['lr']
-
 		progressbar.close()
 
 		lr_scheduler_global.step(running_global_loss / float(i))
@@ -237,9 +234,9 @@ def main():
 		writer.add_scalars("Train/losses", {'global_loss': running_global_loss / float(i),
 											'local_loss': running_local_loss / float(i),
 											'fusion_loss': running_fusion_loss / float(i)}, epoch)
-		writer.add_scalar("Train/learning_rate", {'lr_global': lr_global,
-													'lr_local': lr_local,
-													'lr_fusion': lr_fusion}, epoch)
+		writer.add_scalar("Train/learning_rate", {'lr_global': lr_scheduler_global.get_last_lr(),
+													'lr_local': lr_scheduler_local.get_last_lr(),
+													'lr_fusion': lr_scheduler_fusion.get_last_lr()}, epoch)
 
 		writer.flush()
 
