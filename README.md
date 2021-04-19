@@ -33,5 +33,10 @@
 ```
 ## Result
 ------
-![result best epoch model](https://github.com/maftuhm/lung-desease-detection-agcnn/blob/main/screenshot/exp9_best_epoch_model_result.png)
-![result last epoch model](https://github.com/maftuhm/lung-desease-detection-agcnn/blob/main/screenshot/exp9_last_epoch_model_result.png)
+Result from best and last epoch
+
+Best
+![result best epoch model](https://github.com/maftuhm/lung-desease-detection-agcnn/blob/main/screenshot/exp11_best_epoch_model_result.png)
+
+Last
+![result last epoch model](https://github.com/maftuhm/lung-desease-detection-agcnn/blob/main/screenshot/exp11_last_epoch_model_result.png)
