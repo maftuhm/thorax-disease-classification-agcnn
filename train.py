@@ -20,7 +20,7 @@ from utils import *
 def parse_args():
 	parser = argparse.ArgumentParser(description='AG-CNN')
 	parser.add_argument('--use', type=str, default='train', help='use for what (train or test)')
-	parser.add_argument("--exp_dir", type=str, default="./experiments/exp12")
+	parser.add_argument("--exp_dir", type=str, default="./experiments/exp13")
 	parser.add_argument("--resume", "-r", action="store_true")
 	args = parser.parse_args()
 	return args
@@ -91,9 +91,9 @@ def main():
 	optimizer_fusion = optim.SGD(FusionModel.parameters(), **exp_cfg['optimizer']['SGD'])
 
 	# ================= SCHEDULER ================= #
-	lr_scheduler_global = optim.lr_scheduler.ReduceLROnPlateau(optimizer_global , **exp_cfg['lr_scheduler'])
-	lr_scheduler_local = optim.lr_scheduler.ReduceLROnPlateau(optimizer_local , **exp_cfg['lr_scheduler'])
-	lr_scheduler_fusion = optim.lr_scheduler.ReduceLROnPlateau(optimizer_fusion , **exp_cfg['lr_scheduler'])
+	lr_scheduler_global = optim.lr_scheduler.StepLR(optimizer_global , **exp_cfg['lr_scheduler'])
+	lr_scheduler_local = optim.lr_scheduler.StepLR(optimizer_local , **exp_cfg['lr_scheduler'])
+	lr_scheduler_fusion = optim.lr_scheduler.StepLR(optimizer_fusion , **exp_cfg['lr_scheduler'])
 
 	# ================= LOSS FUNCTION ================= #
 	# criterion = nn.BCELoss()
@@ -209,9 +209,9 @@ def main():
 
 		progressbar.close()
 
-		lr_scheduler_global.step(running_global_loss / float(i))
-		lr_scheduler_local.step(running_local_loss / float(i))
-		lr_scheduler_fusion.step(running_fusion_loss / float(i))
+		lr_scheduler_global.step()
+		lr_scheduler_local.step()
+		lr_scheduler_fusion.step()
 
 		# SAVE MODEL
 		save_model(args.exp_dir, epoch,
@@ -236,7 +236,7 @@ def main():
 		writer.add_scalars("Train/losses", {'global_loss': running_global_loss / float(i),
 											'local_loss': running_local_loss / float(i),
 											'fusion_loss': running_fusion_loss / float(i)}, epoch)
-		writer.add_scalar("Train/learning_rate", {'lr_global': optimizer_global.param_groups[0]['lr'],
+		writer.add_scalars("Train/learning_rate", {'lr_global': optimizer_global.param_groups[0]['lr'],
 													'lr_local': optimizer_local.param_groups[0]['lr'],
 													'lr_fusion': optimizer_fusion.param_groups[0]['lr']}, epoch)
 
