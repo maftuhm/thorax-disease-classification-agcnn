@@ -43,7 +43,7 @@ def L3(feature):
 	output = output / torch.max(output)
 	return output
 
-def AttentionGenPatchs(ori_image, features_global, threshold = 0.):
+def AttentionGenPatchs(ori_image, features_global, threshold = 0.7):
 
 	batch_size = features_global.shape[0]
 	n, c, h, w = ori_image.shape

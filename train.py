@@ -39,9 +39,9 @@ classes_name = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mas
 max_batch_capacity = 8
 
 best_AUCs = {
-	'global': -1000,
-	'local': -1000,
-	'fusion': -1000
+	'global': 0.83900,
+	'local': 0.77362,
+	'fusion': 0.82677
 }
 
 cudnn.benchmark = True

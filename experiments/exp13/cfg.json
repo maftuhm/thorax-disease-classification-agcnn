@@ -1,5 +1,5 @@
 {
-	"NUM_EPOCH" : 60,
+	"NUM_EPOCH" : 120,
 	"dataset" : {
 		"resize" : [256, 256],
 		"crop" : [224, 224]
