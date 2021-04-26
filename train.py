@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 import torch.backends.cudnn as cudnn
 
 import torchvision.transforms as transforms
@@ -32,21 +32,74 @@ with open(path.join(args.exp_dir, "cfg.json")) as f:
 	exp_cfg = json.load(f)
 
 # ================= CONSTANTS ================= #
-data_dir = path.join('..', 'lung-disease-detection', 'data')
+data_dir = path.join('D:/', 'Data', 'data')
 classes_name = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass', 'Nodule', 'Pneumonia',
 				'Pneumothorax', 'Consolidation', 'Edema', 'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia']
 
 max_batch_capacity = 8
 
 best_AUCs = {
-	'global': 0.83900,
-	'local': 0.77362,
-	'fusion': 0.82677
+	'global': -1000,
+	'local': -1000,
+	'fusion': -1000
 }
 
 cudnn.benchmark = True
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-writer = SummaryWriter(args.exp_dir + '/log')
+# writer = SummaryWriter(args.exp_dir + '/log')
+
+def train_one_epoch(model, optimizer, lr_scheduler, data_loader, epoch, test_model = None, branch = ''):
+	print(' Epoch [{}/{}]'.format(epoch , exp_cfg['NUM_EPOCH'] - 1))
+
+	model.train()
+	running_loss = 0.
+	len_data = len(data_loader)
+	progressbar = tqdm(range(len_data))
+
+	for i, (images, targets) in enumerate(data_loader):
+
+		if branch == 'local':
+			with torch.no_grad():
+				output_global = test_model(images.to(device))
+				output_patches = AttentionGenPatchs(images.detach(), output_global['features'].cpu())
+				images = output_patches['crop']
+
+			del output_global, output_patches
+			torch.cuda.empty_cache()
+		
+		elif branch == 'fusion':
+			with torch.no_grad():
+				output_global = test_model[0](images.to(device))
+				output_patches = AttentionGenPatchs(images.detach(), output_global['features'].cpu())
+				output_local = test_model[1](output_patches['crop'].to(device))
+				images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
+
+			del output_global, output_local, output_patches
+			torch.cuda.empty_cache()
+
+		else:
+			raise Exception("Branch must be local or fusion")
+
+		images = images.to(device)
+		targets = targets.to(device)
+
+		output = model(images, targets)
+
+		loss = output['loss']
+		running_loss += loss.data.item()
+
+		optimizer.zero_grad()
+		loss.backward()
+		optimizer.step()
+
+		progressbar.set_description("batch loss: {loss:.3f} ".format(loss = loss.data.item()))
+		progressbar.update(1)
+	
+	lr_scheduler.step()
+	progressbar.close()
+
+	epoch_loss = running_loss / float(len_data)
+	print(' Epoch over Loss: {:.5f}'.format(epoch_loss))
 
 def main():
 	# ================= TRANSFORMS ================= #
@@ -198,7 +251,7 @@ def main():
 
 			if (i + 1) % 5000 == 0:
 				draw_image = drawImage(image, target, output_fusion.detach().cpu(), image_patch.detach(), heatmaps, coordinates)
-				writer.add_images("Train/epoch_{}".format(epoch), draw_image, i + 1)
+				# writer.add_images("Train/epoch_{}".format(epoch), draw_image, i + 1)
 
 			progressbar.update(1)
 
@@ -232,15 +285,15 @@ def main():
 
 		epoch_train_loss = float(running_loss) / float(i)
 		print(' Epoch over Loss: {:.5f}'.format(epoch_train_loss))
-		writer.add_scalar("Train/loss", epoch_train_loss, epoch)
-		writer.add_scalars("Train/losses", {'global_loss': running_global_loss / float(i),
-											'local_loss': running_local_loss / float(i),
-											'fusion_loss': running_fusion_loss / float(i)}, epoch)
-		writer.add_scalars("Train/learning_rate", {'lr_global': optimizer_global.param_groups[0]['lr'],
-													'lr_local': optimizer_local.param_groups[0]['lr'],
-													'lr_fusion': optimizer_fusion.param_groups[0]['lr']}, epoch)
+		# writer.add_scalar("Train/loss", epoch_train_loss, epoch)
+		# writer.add_scalars("Train/losses", {'global_loss': running_global_loss / float(i),
+		# 									'local_loss': running_local_loss / float(i),
+		# 									'fusion_loss': running_fusion_loss / float(i)}, epoch)
+		# writer.add_scalars("Train/learning_rate", {'lr_global': optimizer_global.param_groups[0]['lr'],
+		# 											'lr_local': optimizer_local.param_groups[0]['lr'],
+		# 											'lr_fusion': optimizer_fusion.param_groups[0]['lr']}, epoch)
 
-		writer.flush()
+		# writer.flush()
 
 		test(epoch, GlobalModel, LocalModel, FusionModel, val_loader)
 
@@ -276,7 +329,7 @@ def test(epoch, GlobalModel, LocalModel, FusionModel, test_loader):
 
 			if (i + 1) % 300 == 0:
 				draw_image = drawImage(image, target, output_fusion.detach().cpu(), image_patch.detach(), heatmaps, coordinates)
-				writer.add_images("Val/epoch_{}".format(epoch), draw_image, i + 1)
+				# writer.add_images("Val/epoch_{}".format(epoch), draw_image, i + 1)
 
 			progressbar.update(1)
 
@@ -345,14 +398,14 @@ def test(epoch, GlobalModel, LocalModel, FusionModel, test_loader):
 	print("| Average\t\t|  {:.10f}\t\t|  {:.10f}\t\t|  {:.10f}\t\t|".format(AUROCs_global_avg, AUROCs_local_avg, AUROCs_fusion_avg))
 	print("|===============================================================================================|")
 	print()
-	writer.add_scalar("Val/AUROC", (AUROCs_global_avg + AUROCs_local_avg + AUROCs_fusion_avg) / 3, epoch)
-	writer.add_scalars("Val/AUROCs", {'AUROCs_global_avg': AUROCs_global_avg,
-										'AUROCs_local_avg': AUROCs_local_avg,
-										'AUROCs_fusion_avg': AUROCs_fusion_avg}, epoch)
-	writer.add_scalars("Val/AUROCs_global", dict_AUROCs_global, epoch)
-	writer.add_scalars("Val/AUROCs_local", dict_AUROCs_local, epoch)
-	writer.add_scalars("Val/AUROCs_fusion", dict_AUROCs_fusion, epoch)
-	writer.flush()
+	# writer.add_scalar("Val/AUROC", (AUROCs_global_avg + AUROCs_local_avg + AUROCs_fusion_avg) / 3, epoch)
+	# writer.add_scalars("Val/AUROCs", {'AUROCs_global_avg': AUROCs_global_avg,
+	# 									'AUROCs_local_avg': AUROCs_local_avg,
+	# 									'AUROCs_fusion_avg': AUROCs_fusion_avg}, epoch)
+	# writer.add_scalars("Val/AUROCs_global", dict_AUROCs_global, epoch)
+	# writer.add_scalars("Val/AUROCs_local", dict_AUROCs_local, epoch)
+	# writer.add_scalars("Val/AUROCs_fusion", dict_AUROCs_fusion, epoch)
+	# writer.flush()
 
 if __name__ == "__main__":
 	main()

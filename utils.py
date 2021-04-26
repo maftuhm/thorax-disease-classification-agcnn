@@ -78,7 +78,13 @@ def AttentionGenPatchs(ori_image, features_global, threshold = 0.7):
 
 		coordinates.append((xmin, ymin, xmax, ymax))
 
-	return cropped_image, heatmaps, coordinates
+	output = {
+		'crop' : cropped_image,
+		'heatmap' : heatmaps,
+		'coordinate' : coordinates
+	}
+
+	return output
 
 
 def selectMaxConnect(heatmap):
