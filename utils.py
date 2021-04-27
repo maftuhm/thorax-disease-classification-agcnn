@@ -101,9 +101,10 @@ def selectMaxConnect(heatmap):
 	lcc = lcc + 0
 	return lcc 
 
-def save_model(exp_dir, epoch, model, optimizer, lr_scheduler, branch_name = 'global'):
+def save_model(exp_dir, epoch, loss, model, optimizer, lr_scheduler, branch_name = 'global'):
 	save_dict = {
 		"epoch": epoch,
+		"loss": loss,
 		"net": model.state_dict(),
 		"optim": optimizer.state_dict(),
 		"lr_scheduler": lr_scheduler.state_dict()

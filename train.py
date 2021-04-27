@@ -14,7 +14,7 @@ import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 
 from read_data import ChestXrayDataSet
-from model import Net, FusionNet, WeightedBCELoss
+from model import ResAttCheXNet, FusionNet, WeightedBCELoss
 from utils import *
 
 def parse_args():
@@ -33,23 +33,23 @@ with open(path.join(args.exp_dir, "cfg.json")) as f:
 
 # ================= CONSTANTS ================= #
 data_dir = path.join('D:/', 'Data', 'data')
-classes_name = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass', 'Nodule', 'Pneumonia',
+CLASS_NAMES = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass', 'Nodule', 'Pneumonia',
 				'Pneumothorax', 'Consolidation', 'Edema', 'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia']
 
-max_batch_capacity = 8
+BRANCH_NAME_LIST = ['global', 'local', 'fusion']
+BEST_VAL_LOSS = {branch: 1000 for branch in BRANCH_NAME_LIST}
 
-best_AUCs = {
-	'global': -1000,
-	'local': -1000,
-	'fusion': -1000
+MAX_BATCH_CAPACITY = {
+	'global' : 2,
+	'local' : 1,
+	'fusion' : 1
 }
 
 cudnn.benchmark = True
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 # writer = SummaryWriter(args.exp_dir + '/log')
 
-def train_one_epoch(model, optimizer, lr_scheduler, data_loader, epoch, test_model = None, branch = ''):
-	print(' Epoch [{}/{}]'.format(epoch , exp_cfg['NUM_EPOCH'] - 1))
+def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, test_model = None):
 
 	model.train()
 	running_loss = 0.
@@ -77,9 +77,6 @@ def train_one_epoch(model, optimizer, lr_scheduler, data_loader, epoch, test_mod
 			del output_global, output_local, output_patches
 			torch.cuda.empty_cache()
 
-		else:
-			raise Exception("Branch must be local or fusion")
-
 		images = images.to(device)
 		targets = targets.to(device)
 
@@ -92,7 +89,7 @@ def train_one_epoch(model, optimizer, lr_scheduler, data_loader, epoch, test_mod
 		loss.backward()
 		optimizer.step()
 
-		progressbar.set_description("batch loss: {loss:.3f} ".format(loss = loss.data.item()))
+		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch, exp_cfg['NUM_EPOCH'] - 1, loss.data.item()))
 		progressbar.update(1)
 	
 	lr_scheduler.step()
@@ -100,6 +97,89 @@ def train_one_epoch(model, optimizer, lr_scheduler, data_loader, epoch, test_mod
 
 	epoch_loss = running_loss / float(len_data)
 	print(' Epoch over Loss: {:.5f}'.format(epoch_loss))
+
+	# SAVE MODEL
+	save_model(args.exp_dir, epoch, epoch_loss, model, optimizer, lr_scheduler, branch)
+
+@torch.no_grad()
+def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
+
+	print(" Validating {} model".format(branch, epoch))
+
+	model.eval()
+	
+	gt = torch.FloatTensor()
+	pred = torch.FloatTensor()
+
+	running_loss = 0.
+	len_data = len(data_loader)
+	progressbar = tqdm(range(len_data))
+
+	for i, (images, targets) in enumerate(data_loader):
+
+		if branch == 'local':
+			output_global = test_model(images.to(device))
+			output_patches = AttentionGenPatchs(images.detach(), output_global['features'].cpu())
+			images = output_patches['crop']
+
+			del output_global, output_patches
+			torch.cuda.empty_cache()
+		
+		elif branch == 'fusion':
+			output_global = test_model[0](images.to(device))
+			output_patches = AttentionGenPatchs(images.detach(), output_global['features'].cpu())
+			output_local = test_model[1](output_patches['crop'].to(device))
+			images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
+
+			del output_global, output_local, output_patches
+			torch.cuda.empty_cache()
+
+		images = images.to(device)
+		targets = targets.to(device)
+		gt = torch.cat((gt, targets.detach().cpu()), 0)
+
+		output = model(images, targets)
+		pred = torch.cat((pred, output['scores'].detach().cpu()), 0)
+
+		loss = output['loss'].detach().item()
+
+		running_loss += loss
+
+		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch,  exp_cfg['NUM_EPOCH'] - 1, loss))
+		progressbar.update(1)
+
+	progressbar.close()
+
+	epoch_loss = float(running_loss) / float(len_data)
+	# writer.add_scalar('val/' + branch + ' loss', epoch_loss, epoch)
+	print(' Epoch over Loss: {:.5f}'.format(epoch_loss))
+
+	if epoch_loss < BEST_VAL_LOSS[branch]:
+		BEST_VAL_LOSS[branch] = epoch_loss
+		save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_' + branch + '.pth')
+		copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_' + branch + '_best.pth')
+		shutil.copyfile(save_name, copy_name)
+		print(" Best model is saved: {}".format(copy_name))
+
+	AUROCs = compute_AUCs(gt, pred)
+	print(' Best Loss: {:.5f}'.format(BEST_VAL_LOSS[branch]))
+	print("|=======================================|")
+	print("|\t\t  AUROC\t\t\t|")
+	print("|=======================================|")
+	print("|\t      global branch\t\t|")
+	print("|---------------------------------------|")
+	for i in range(len(CLASS_NAMES)):
+		if len(CLASS_NAMES[i]) < 6:
+			print("| {}\t\t\t|".format(CLASS_NAMES[i]), end="")
+		elif len(CLASS_NAMES[i]) > 14:
+			print("| {}\t|".format(CLASS_NAMES[i]), end="")
+		else:
+			print("| {}\t\t|".format(CLASS_NAMES[i]), end="")
+		print("  {:.10f}\t|".format(AUROCs[i]))
+	print("|---------------------------------------|")
+	print("| Average\t\t|  {:.10f}\t|".format(np.array(AUROCs).mean()))
+	print("|=======================================|")
+	print()
 
 def main():
 	# ================= TRANSFORMS ================= #
@@ -123,289 +203,77 @@ def main():
 	   normalize,
 	])
 
-	# ================= LOAD DATASET ================= #
-	train_dataset = ChestXrayDataSet(data_dir = data_dir,split = 'train', transform = transform_train)
-	train_loader = DataLoader(dataset = train_dataset, batch_size = max_batch_capacity, shuffle = True, num_workers = 4)
-
-	val_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'val', transform = transform_test)
-	val_loader = DataLoader(dataset = val_dataset, batch_size = 32, shuffle = False, num_workers = 4)
-
-	test_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'test', transform = transform_test)
-	test_loader = DataLoader(dataset = test_dataset, batch_size = 32, shuffle = False, num_workers = 4)
-
 	# ================= MODELS ================= #
-	GlobalModel = Net(exp_cfg['backbone']).to(device)
-	LocalModel = Net(exp_cfg['backbone']).to(device)
-	FusionModel = FusionNet(exp_cfg['backbone']).to(device)
+	GlobalModel = ResAttCheXNet()
+	LocalModel = ResAttCheXNet()
+	FusionModel = FusionNet()
 
-	# ================= OPTIMIZER ================= #
-	optimizer_global = optim.SGD(GlobalModel.parameters(), **exp_cfg['optimizer']['SGD'])
-	optimizer_local = optim.SGD(LocalModel.parameters(), **exp_cfg['optimizer']['SGD'])
-	optimizer_fusion = optim.SGD(FusionModel.parameters(), **exp_cfg['optimizer']['SGD'])
+	for branch_name in BRANCH_NAME_LIST:
+		print(" Start training " + branch_name + " branch...")
 
-	# ================= SCHEDULER ================= #
-	lr_scheduler_global = optim.lr_scheduler.StepLR(optimizer_global , **exp_cfg['lr_scheduler'])
-	lr_scheduler_local = optim.lr_scheduler.StepLR(optimizer_local , **exp_cfg['lr_scheduler'])
-	lr_scheduler_fusion = optim.lr_scheduler.StepLR(optimizer_fusion , **exp_cfg['lr_scheduler'])
+		batch_multiplier = exp_cfg['batch_size'][branch_name] // MAX_BATCH_CAPACITY[branch_name]
 
-	# ================= LOSS FUNCTION ================= #
-	# criterion = nn.BCELoss()
-	criterion = WeightedBCELoss(PosNegWeightIsDynamic = True)
+		# ================= LOAD DATASET ================= #
+		train_dataset = ChestXrayDataSet(data_dir = data_dir,split = 'train', transform = transform_train)
+		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 4, pin_memory = True)
 
-	if args.resume:
-		start_epoch = 0
-		checkpoint_global = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global.pth')
-		checkpoint_local = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_local.pth')
-		checkpoint_fusion = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_fusion.pth')
+		val_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'val', transform = transform_test)
+		val_loader = DataLoader(dataset = val_dataset, batch_size = exp_cfg['batch_size'][branch_name] // 2, shuffle = False, num_workers = 4, pin_memory = True)
 
-		if path.isfile(checkpoint_global):
-			save_dict = torch.load(checkpoint_global)
-			start_epoch = max(save_dict['epoch'], start_epoch)
-			GlobalModel.load_state_dict(save_dict['net'])
-			optimizer_global.load_state_dict(save_dict['optim'])
-			lr_scheduler_global.load_state_dict(save_dict['lr_scheduler'])
-			print(" Loaded Global Branch Model checkpoint")
+		test_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'test', transform = transform_test)
+		test_loader = DataLoader(dataset = test_dataset, batch_size = exp_cfg['batch_size'][branch_name] // 2, shuffle = False, num_workers = 4, pin_memory = True)
 
-		if path.isfile(checkpoint_local):
-			save_dict = torch.load(checkpoint_local)
-			start_epoch = max(save_dict['epoch'], start_epoch)
-			LocalModel.load_state_dict(save_dict['net'])
-			optimizer_local.load_state_dict(save_dict['optim'])
-			lr_scheduler_local.load_state_dict(save_dict['lr_scheduler'])
-			print(" Loaded Local Branch Model checkpoint")
+		if branch_name == 'global':
+			Model = GlobalModel.to(device)
+			TestModel = None
 
-		if path.isfile(checkpoint_fusion):
-			save_dict = torch.load(checkpoint_fusion)
-			start_epoch = max(save_dict['epoch'], start_epoch)
-			FusionModel.load_state_dict(save_dict['net'])
-			optimizer_fusion.load_state_dict(save_dict['optim'])
-			lr_scheduler_fusion.load_state_dict(save_dict['lr_scheduler'])
-			print(" Loaded Fusion Branch Model checkpoint")
+		if branch_name == 'local':
 
-		start_epoch += 1
+			save_dict_global = torch.load(os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global_best' + '.pth'))
+			GlobalModel.load_state_dict(save_dict_global['net'])
 
-	else:
-		start_epoch = 0
-		write_csv(path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_AUROCs.csv'),
-							data = ['Model'] + classes_name + ['Mean'],
-							mode = 'w')
+			Model = LocalModel.to(device)
+			TestModel = GlobalModel.to(device)
 
-	for epoch in range(start_epoch, exp_cfg['NUM_EPOCH']):
-		print(' Epoch [{}/{}]'.format(epoch , exp_cfg['NUM_EPOCH'] - 1))
+		if branch_name == 'fusion':
 
-		GlobalModel.train()
-		LocalModel.train()
-		FusionModel.train()
+			save_dict_global = torch.load(os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global_best' + '.pth'))
+			save_dict_local = torch.load(os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_local_best' + '.pth'))
 
-		optimizer_global.zero_grad()
-		optimizer_local.zero_grad()
-		optimizer_fusion.zero_grad()
+			GlobalModel.load_state_dict(save_dict_global['net'])
+			LocalModel.load_state_dict(save_dict_local['net'])
 
-		running_loss = 0.
-		running_global_loss = 0.
-		running_local_loss = 0.
-		running_fusion_loss = 0.
-		mini_batch_loss = 0.
+			Model = FusionModel.to(device)
+			TestModel = (GlobalModel.to(device), LocalModel.to(device))
 
-		batch_multiplier = 32
+		optimizer = optim.SGD(Model.parameters(), **exp_cfg['optimizer']['SGD'])
+		lr_scheduler = optim.lr_scheduler.StepLR(optimizer , **exp_cfg['lr_scheduler'])
 
-		progressbar = tqdm(range(len(train_loader)))
+		if args.resume:
 
-		# torch.autograd.set_detect_anomaly(True)
-		
-		for i, (image, target) in enumerate(train_loader):
+			checkpoint = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_' + branch_name + '.pth')
 
-			# compute output
-			output_global, fm_global, pool_global = GlobalModel(image.to(device))
-			
-			image_patch, heatmaps, coordinates = AttentionGenPatchs(image.detach(), fm_global.detach().cpu())
+			if path.isfile(checkpoint):
+				save_dict = torch.load(checkpoint)
+				Model.load_state_dict(save_dict['net'])
+				optimizer.load_state_dict(save_dict['optim'])
+				lr_scheduler.load_state_dict(save_dict['lr_scheduler'])
+				start_epoch = save_dict['epoch']
+				BEST_VAL_LOSS[branch_name] = save_dict['loss']
+				print(" Loaded " + branch_name + " branch model checkpoint from epoch " + str(start_epoch))
+				start_epoch += 1
+			else:
+				start_epoch = 0
 
-			output_local, _, pool_local = LocalModel(image_patch.to(device))
-
-			output_fusion = FusionModel(pool_global, pool_local)
-
-			# loss
-			global_loss = criterion(output_global, target.to(device))
-			local_loss = criterion(output_local, target.to(device))
-			fusion_loss = criterion(output_fusion, target.to(device))
-
-			loss = (global_loss + local_loss + fusion_loss) / batch_multiplier
-			loss.backward()
-
-			if (i + 1) % batch_multiplier == 0:
-				optimizer_global.step()
-				optimizer_local.step()
-				optimizer_fusion.step()
-
-				optimizer_global.zero_grad()
-				optimizer_local.zero_grad()
-				optimizer_fusion.zero_grad()
-			
-			progressbar.set_description(" bacth loss: {loss:.3f} "
-										"loss1: {loss1:.3f} "
-										"loss2: {loss2:.3f} "
-										"loss3: {loss3:.3f}".format(loss = loss.data.item() * batch_multiplier,
-																	loss1 = global_loss.data.item(),
-																	loss2 = local_loss.data.item(),
-																	loss3 = fusion_loss.data.item()))
-
-			if (i + 1) % 5000 == 0:
-				draw_image = drawImage(image, target, output_fusion.detach().cpu(), image_patch.detach(), heatmaps, coordinates)
-				# writer.add_images("Train/epoch_{}".format(epoch), draw_image, i + 1)
-
-			progressbar.update(1)
-
-			running_loss += loss.data.item() * batch_multiplier
-			running_global_loss += global_loss.data.item()
-			running_local_loss += local_loss.data.item()
-			running_fusion_loss += fusion_loss.data.item()
-
-		progressbar.close()
-
-		lr_scheduler_global.step()
-		lr_scheduler_local.step()
-		lr_scheduler_fusion.step()
-
-		# SAVE MODEL
-		save_model(args.exp_dir, epoch,
-					model = GlobalModel,
-					optimizer = optimizer_global,
-					lr_scheduler = lr_scheduler_global,
-					branch_name = 'global')
-		save_model(args.exp_dir, epoch,
-					model = LocalModel,
-					optimizer = optimizer_local,
-					lr_scheduler = lr_scheduler_local,
-					branch_name = 'local')
-		save_model(args.exp_dir, epoch,
-					model = FusionModel,
-					optimizer = optimizer_fusion,
-					lr_scheduler = lr_scheduler_fusion,
-					branch_name = 'fusion')
-
-		epoch_train_loss = float(running_loss) / float(i)
-		print(' Epoch over Loss: {:.5f}'.format(epoch_train_loss))
-		# writer.add_scalar("Train/loss", epoch_train_loss, epoch)
-		# writer.add_scalars("Train/losses", {'global_loss': running_global_loss / float(i),
-		# 									'local_loss': running_local_loss / float(i),
-		# 									'fusion_loss': running_fusion_loss / float(i)}, epoch)
-		# writer.add_scalars("Train/learning_rate", {'lr_global': optimizer_global.param_groups[0]['lr'],
-		# 											'lr_local': optimizer_local.param_groups[0]['lr'],
-		# 											'lr_fusion': optimizer_fusion.param_groups[0]['lr']}, epoch)
-
-		# writer.flush()
-
-		test(epoch, GlobalModel, LocalModel, FusionModel, val_loader)
-
-def test(epoch, GlobalModel, LocalModel, FusionModel, test_loader):
-
-	GlobalModel.eval()
-	LocalModel.eval()
-	FusionModel.eval()
-
-	ground_truth = torch.FloatTensor()
-	pred_global = torch.FloatTensor()
-	pred_local = torch.FloatTensor()
-	pred_fusion = torch.FloatTensor()
-
-	progressbar = tqdm(range(len(test_loader)))
-
-	with torch.no_grad():
-		for i, (image, target) in enumerate(test_loader):
-
-			# compute output
-			output_global, fm_global, pool_global = GlobalModel(image.to(device))
-			
-			image_patch, heatmaps, coordinates = AttentionGenPatchs(image.detach(), fm_global.detach().cpu())
-
-			output_local, _, pool_local = LocalModel(image_patch.to(device))
-
-			output_fusion = FusionModel(pool_global, pool_local)
-
-			ground_truth = torch.cat((ground_truth, target.detach()), 0)
-			pred_global = torch.cat((pred_global.detach(), output_global.detach().cpu()), 0)
-			pred_local = torch.cat((pred_local.detach(), output_local.detach().cpu()), 0)
-			pred_fusion = torch.cat((pred_fusion.detach(), output_fusion.detach().cpu()), 0)
-
-			if (i + 1) % 300 == 0:
-				draw_image = drawImage(image, target, output_fusion.detach().cpu(), image_patch.detach(), heatmaps, coordinates)
-				# writer.add_images("Val/epoch_{}".format(epoch), draw_image, i + 1)
-
-			progressbar.update(1)
-
-		progressbar.close()
-
-	AUROCs_global = compute_AUCs(ground_truth, pred_global)
-	AUROCs_global_avg = np.array(AUROCs_global).mean()
-	AUROCs_local = compute_AUCs(ground_truth, pred_local)
-	AUROCs_local_avg = np.array(AUROCs_local).mean()
-	AUROCs_fusion = compute_AUCs(ground_truth, pred_fusion)
-	AUROCs_fusion_avg = np.array(AUROCs_fusion).mean()
-
-	if AUROCs_global_avg > best_AUCs['global']:
-		best_AUCs['global'] = AUROCs_global_avg
-		save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global.pth')
-		copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_global_best.pth')
-		shutil.copyfile(save_name, copy_name)
-		print(" Global best model is saved: {}".format(copy_name))
-
-	if AUROCs_local_avg > best_AUCs['local']:
-		best_AUCs['local'] = AUROCs_local_avg
-		save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_local.pth')
-		copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_local_best.pth')
-		shutil.copyfile(save_name, copy_name)
-		print(" Local best model is saved: {}".format(copy_name))
-
-	if AUROCs_fusion_avg > best_AUCs['fusion']:
-		best_AUCs['fusion'] = AUROCs_fusion_avg
-		save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_fusion.pth')
-		copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_fusion_best.pth')
-		shutil.copyfile(save_name, copy_name)
-		print(" Fusion best model is saved: {}".format(copy_name))
-
-	write_csv(path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_AUROCs.csv'),
-						data = ['Global'] + list(AUROCs_global) + [AUROCs_global_avg],
-						mode = 'a')
-	write_csv(path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_AUROCs.csv'),
-						data = ['Local'] + list(AUROCs_local) + [AUROCs_local_avg],
-						mode = 'a')
-	write_csv(path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_AUROCs.csv'),
-						data = ['Fusion'] + list(AUROCs_fusion) + [AUROCs_fusion_avg],
-						mode = 'a')
-
-	print(' Best AUROCs global: {:.5f} | local: {:.5f} | fusion: {:.5f}'.format(best_AUCs['global'], best_AUCs['local'], best_AUCs['fusion']))
-
-	print("|===============================================================================================|")
-	print("|\t\t\t\t\t    AUROC\t\t\t\t\t\t|")
-	print("|===============================================================================================|")
-	print("|\t\t\t|  Global branch\t|  Local branch\t\t|  Fusion branch\t|")
-	print("|-----------------------------------------------------------------------------------------------|")
-	dict_AUROCs_global, dict_AUROCs_local, dict_AUROCs_fusion = {}, {}, {}
-
-	for i in range(len(classes_name)):
-		dict_AUROCs_global[classes_name[i]] = AUROCs_global[i]
-		dict_AUROCs_local[classes_name[i]] = AUROCs_local[i]
-		dict_AUROCs_fusion[classes_name[i]] = AUROCs_fusion[i]
-
-		if len(classes_name[i]) < 6:
-			print("| {}\t\t\t|".format(classes_name[i]), end="")
-		elif len(classes_name[i]) > 14:
-			print("| {}\t|".format(classes_name[i]), end="")
 		else:
-			print("| {}\t\t|".format(classes_name[i]), end="")
-		print("  {:.10f}\t\t|  {:.10f}\t\t|  {:.10f}\t\t|".format(AUROCs_global[i], AUROCs_local[i], AUROCs_fusion[i]))
-	print("|-----------------------------------------------------------------------------------------------|")
-	print("| Average\t\t|  {:.10f}\t\t|  {:.10f}\t\t|  {:.10f}\t\t|".format(AUROCs_global_avg, AUROCs_local_avg, AUROCs_fusion_avg))
-	print("|===============================================================================================|")
-	print()
-	# writer.add_scalar("Val/AUROC", (AUROCs_global_avg + AUROCs_local_avg + AUROCs_fusion_avg) / 3, epoch)
-	# writer.add_scalars("Val/AUROCs", {'AUROCs_global_avg': AUROCs_global_avg,
-	# 									'AUROCs_local_avg': AUROCs_local_avg,
-	# 									'AUROCs_fusion_avg': AUROCs_fusion_avg}, epoch)
-	# writer.add_scalars("Val/AUROCs_global", dict_AUROCs_global, epoch)
-	# writer.add_scalars("Val/AUROCs_local", dict_AUROCs_local, epoch)
-	# writer.add_scalars("Val/AUROCs_fusion", dict_AUROCs_fusion, epoch)
-	# writer.flush()
+			start_epoch = 0
+
+		for epoch in range(start_epoch, exp_cfg['NUM_EPOCH']):
+
+			train_one_epoch(epoch, branch_name, Model, optimizer, lr_scheduler, train_loader, TestModel)
+			val_one_epoch(epoch, branch_name, Model, train_loader, TestModel)
+
+		print(" Training " + branch_name + " branch done.")
 
 if __name__ == "__main__":
 	main()

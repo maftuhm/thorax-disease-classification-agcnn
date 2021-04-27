@@ -70,9 +70,9 @@ class ResAttCheXNet(nn.Module):
         # ----------------- attention layer -----------------
         self.attention = nn.Sequential(
             nn.Conv2d(self.num_features, self.num_features, kernel_size = 3, padding = 1),
-            nn.ReLu(),
+            nn.ReLU(),
             nn.Conv2d(self.num_features, self.num_features, kernel_size = 3, padding = 1),
-            nn.ReLu(),
+            nn.ReLU(),
             nn.Conv2d(self.num_features, self.num_classes, kernel_size = 1),
             nn.Sigmoid()
         )
@@ -84,23 +84,23 @@ class ResAttCheXNet(nn.Module):
         flatten_pool = torch.flatten(pool, 1)
         scores = self.fc(flatten_pool)
 
-        residual_features = self.discriminative_features(features, self.attention(features))
-        scores_residual = self.fc_residual(torch.flatten(residual_features, 1))
+        # residual_features = self.discriminative_features(features, self.attention(features))
+        # scores_residual = self.fc_residual(torch.flatten(residual_features, 1))
 
         if label is not None:
             loss = self.criterion(scores, label)
-            loss_residual = self.criterion(scores_residual, label)
+            # loss_residual = self.criterion(scores_residual, label)
         else:
             loss = torch.tensor(0, dtype=image.dtype, device=image.device)
-            loss_residual = torch.tensor(0, dtype=image.dtype, device=image.device)
+            # loss_residual = torch.tensor(0, dtype=image.dtype, device=image.device)
 
         output = {
             'scores' : scores,
-            'scores_residual' : scores_residual,
+            # 'scores_residual' : scores_residual,
             'features' : features,
             'pool' : flatten_pool,
             'loss' : loss,
-            'loss_residual' : loss_residual
+            # 'loss_residual' : loss_residual
         }
 
         return output
