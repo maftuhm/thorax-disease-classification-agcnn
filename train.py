@@ -14,7 +14,7 @@ import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 
 from read_data import ChestXrayDataSet
-from model import ResAttCheXNet, FusionNet, WeightedBCELoss
+from model import ResAttCheXNet, FusionNet
 from utils import *
 
 def parse_args():

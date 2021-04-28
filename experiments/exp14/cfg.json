@@ -22,9 +22,9 @@
 	},
 	"threshold" : 0.7,
 	"net" : {
-		"r": 5,
-        "pooling_layer" : "lse",
-        "backbone_name" : "resnet50",
+		"lse_controller" : 5,
+        "last_pool" : "lse",
+        "backbone" : "resnet50",
         "pretrained" : true,
         "num_classes" : 14,
         "criterion" : "WeightedBCELoss",
