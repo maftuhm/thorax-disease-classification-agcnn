@@ -20,7 +20,7 @@ from utils import *
 def parse_args():
 	parser = argparse.ArgumentParser(description='AG-CNN')
 	parser.add_argument('--use', type=str, default='train', help='use for what (train or test)')
-	parser.add_argument("--exp_dir", type=str, default="./experiments/exp13")
+	parser.add_argument("--exp_dir", type=str, default="./experiments/exp14")
 	parser.add_argument("--resume", "-r", action="store_true")
 	args = parser.parse_args()
 	return args
@@ -32,7 +32,7 @@ with open(path.join(args.exp_dir, "cfg.json")) as f:
 	exp_cfg = json.load(f)
 
 # ================= CONSTANTS ================= #
-data_dir = path.join('D:/', 'Data', 'data')
+data_dir = path.join('..', 'lung-disease-detection', 'data')
 CLASS_NAMES = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass', 'Nodule', 'Pneumonia',
 				'Pneumothorax', 'Consolidation', 'Edema', 'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia']
 
@@ -40,9 +40,9 @@ BRANCH_NAME_LIST = ['global', 'local', 'fusion']
 BEST_VAL_LOSS = {branch: 1000 for branch in BRANCH_NAME_LIST}
 
 MAX_BATCH_CAPACITY = {
-	'global' : 2,
-	'local' : 1,
-	'fusion' : 1
+	'global' : 20,
+	'local' : 10,
+	'fusion' : 10
 }
 
 cudnn.benchmark = True
@@ -52,9 +52,13 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, test_model = None):
 
 	model.train()
+	optimizer.zero_grad()
+
 	running_loss = 0.
 	len_data = len(data_loader)
 	progressbar = tqdm(range(len_data))
+
+	batch_multiplier = exp_cfg['batch_size'][branch] // MAX_BATCH_CAPACITY[branch]
 
 	for i, (images, targets) in enumerate(data_loader):
 
@@ -82,16 +86,17 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		output = model(images, targets)
 
-		loss = output['loss']
-		running_loss += loss.data.item()
+		loss = output['loss'] / batch_multiplier
+		running_loss += loss.data.item() * batch_multiplier
 
-		optimizer.zero_grad()
 		loss.backward()
-		optimizer.step()
+		if (i + 1) % batch_multiplier == 0:
+			optimizer.step()
+			optimizer.zero_grad()
 
-		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch, exp_cfg['NUM_EPOCH'] - 1, loss.data.item()))
+		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch, exp_cfg['NUM_EPOCH'] - 1, loss.data.item() * batch_multiplier))
 		progressbar.update(1)
-	
+
 	lr_scheduler.step()
 	progressbar.close()
 
@@ -204,14 +209,12 @@ def main():
 	])
 
 	# ================= MODELS ================= #
-	GlobalModel = ResAttCheXNet()
-	LocalModel = ResAttCheXNet()
-	FusionModel = FusionNet()
+	GlobalModel = ResAttCheXNet(**exp_cfg['net'])
+	LocalModel = ResAttCheXNet(**exp_cfg['net'])
+	FusionModel = FusionNet(**exp_cfg['net'])
 
 	for branch_name in BRANCH_NAME_LIST:
 		print(" Start training " + branch_name + " branch...")
-
-		batch_multiplier = exp_cfg['batch_size'][branch_name] // MAX_BATCH_CAPACITY[branch_name]
 
 		# ================= LOAD DATASET ================= #
 		train_dataset = ChestXrayDataSet(data_dir = data_dir,split = 'train', transform = transform_train)
@@ -271,7 +274,7 @@ def main():
 		for epoch in range(start_epoch, exp_cfg['NUM_EPOCH']):
 
 			train_one_epoch(epoch, branch_name, Model, optimizer, lr_scheduler, train_loader, TestModel)
-			val_one_epoch(epoch, branch_name, Model, train_loader, TestModel)
+			val_one_epoch(epoch, branch_name, Model, val_loader, TestModel)
 
 		print(" Training " + branch_name + " branch done.")
 

@@ -12,7 +12,8 @@ class ResAttCheXNet(nn.Module):
                 pretrained = True,
                 num_classes = 14,
                 criterion = 'WeightedBCELoss',
-                DynamicWeightLoss = True
+                DynamicWeightLoss = True,
+                **kwargs
             ):
         super(ResAttCheXNet, self).__init__()
 
@@ -62,20 +63,20 @@ class ResAttCheXNet(nn.Module):
             nn.Sigmoid()
         )
 
-        self.fc_residual = nn.Sequential(
-            nn.Linear(self.num_features * self.num_classes, self.num_classes),
-            nn.Sigmoid()
-        )
+        # self.fc_residual = nn.Sequential(
+        #     nn.Linear(self.num_features * self.num_classes, self.num_classes),
+        #     nn.Sigmoid()
+        # )
 
         # ----------------- attention layer -----------------
-        self.attention = nn.Sequential(
-            nn.Conv2d(self.num_features, self.num_features, kernel_size = 3, padding = 1),
-            nn.ReLU(),
-            nn.Conv2d(self.num_features, self.num_features, kernel_size = 3, padding = 1),
-            nn.ReLU(),
-            nn.Conv2d(self.num_features, self.num_classes, kernel_size = 1),
-            nn.Sigmoid()
-        )
+        # self.attention = nn.Sequential(
+        #     nn.Conv2d(self.num_features, self.num_features, kernel_size = 3, padding = 1),
+        #     nn.ReLU(),
+        #     nn.Conv2d(self.num_features, self.num_features, kernel_size = 3, padding = 1),
+        #     nn.ReLU(),
+        #     nn.Conv2d(self.num_features, self.num_classes, kernel_size = 1),
+        #     nn.Sigmoid()
+        # )
 
     def forward(self, image, label = None):
         features = self.features(image)
@@ -105,16 +106,16 @@ class ResAttCheXNet(nn.Module):
 
         return output
 
-    def discriminative_features(self, feature, score):
-        num_class = score.shape[1]
-        bz, num_channel, h, w = feature.shape
+    # def discriminative_features(self, feature, score):
+    #     num_class = score.shape[1]
+    #     bz, num_channel, h, w = feature.shape
 
-        feature_weighted = torch.zeros(bz, num_class, num_channel, dtype = score.dtype, device = score.device)
+    #     feature_weighted = torch.zeros(bz, num_class, num_channel, dtype = score.dtype, device = score.device)
 
-        for i in range(bz):
-            feature_weighted[i] = (torch.matmul(score[i].unsqueeze(1) + 1, feature[i])).relu().mean(dim = (-2, -1))
+    #     for i in range(bz):
+    #         feature_weighted[i] = (torch.matmul(score[i].unsqueeze(1) + 1, feature[i])).relu().mean(dim = (-2, -1))
 
-        return feature_weighted
+    #     return feature_weighted
 
 
 class FusionNet(nn.Module):
@@ -123,7 +124,8 @@ class FusionNet(nn.Module):
                 backbone_name = 'resnet50',
                 num_classes = 14,
                 criterion = 'WeightedBCELoss',
-                DynamicWeightLoss = True):
+                DynamicWeightLoss = True,
+                **kwargs):
 
         super(FusionNet, self).__init__()
         self.r = r
