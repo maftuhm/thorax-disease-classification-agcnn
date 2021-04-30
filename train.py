@@ -64,8 +64,8 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		if i == random_int:
 			images_draw = {}
-			images_draw['images'] = images.detach().data
-			images_draw['targets'] = targets.detach().data
+			images_draw['images'] = images.item().data
+			images_draw['targets'] = targets.item().data
 
 		if branch == 'local':
 			with torch.no_grad():
@@ -73,10 +73,7 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 				output_patches = AttentionGenPatchs(images.detach(), output_global['features'].cpu())
 				images = output_patches['crop']
 
-				if i == random_int: 
-					for key in output_patches: images_draw[key] = output_patches[key]
-
-			del output_global, output_patches
+			del output_global
 			torch.cuda.empty_cache()
 		
 		elif branch == 'fusion':
@@ -86,10 +83,7 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 				output_local = test_model[1](output_patches['crop'].to(device))
 				images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
 
-				if i == random_int: 
-					for key in output_patches: images_draw[key] = output_patches[key]
-
-			del output_global, output_local, output_patches
+			del output_global, output_local
 			torch.cuda.empty_cache()
 
 		images = images.to(device)
@@ -107,14 +101,14 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		if i == random_int:
 			if branch == 'global':
-				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['scores'].detach().data)
+				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['scores'].item().data)
 			else:
 				draw_image = drawImage(images_draw['images'],
 										images_draw['targets'],
-										output['scores'].detach().data,
-										images_draw['crop'],
-										images_draw['heatmap'],
-										images_draw['coordinate'])
+										output['scores'].item().data,
+										output_patches['crop'].item().data,
+										output_patches['heatmap'].item().data,
+										output_patches['coordinate'])
 
 			writer.add_images("train/{}".format(branch), draw_image, epoch)
 
@@ -145,15 +139,21 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 	running_loss = 0.
 	len_data = len(data_loader)
 	progressbar = tqdm(range(len_data))
+	random_int = torch.randint(0, len_data, (1,))
 
 	for i, (images, targets) in enumerate(data_loader):
+
+		if i == random_int:
+			images_draw = {}
+			images_draw['images'] = images.item().data
+			images_draw['targets'] = targets.item().data
 
 		if branch == 'local':
 			output_global = test_model(images.to(device))
 			output_patches = AttentionGenPatchs(images.detach(), output_global['features'].cpu())
 			images = output_patches['crop']
 
-			del output_global, output_patches
+			del output_global
 			torch.cuda.empty_cache()
 		
 		elif branch == 'fusion':
@@ -162,7 +162,7 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 			output_local = test_model[1](output_patches['crop'].to(device))
 			images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
 
-			del output_global, output_local, output_patches
+			del output_global, output_local
 			torch.cuda.empty_cache()
 
 		images = images.to(device)
@@ -176,13 +176,27 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 
 		running_loss += loss
 
+		if i == random_int:
+			if branch == 'global':
+				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['scores'].item().data)
+			else:
+				draw_image = drawImage(images_draw['images'],
+										images_draw['targets'],
+										output['scores'].item().data,
+										output_patches['crop'].item().data,
+										output_patches['heatmap'].item().data,
+										output_patches['coordinate'])
+
+			writer.add_images("val/{}".format(branch), draw_image, epoch)
+
 		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch,  exp_cfg['NUM_EPOCH'] - 1, loss))
 		progressbar.update(1)
 
 	progressbar.close()
 
 	epoch_loss = float(running_loss) / float(len_data)
-	# writer.add_scalar('val/' + branch + ' loss', epoch_loss, epoch)
+	writer.add_scalars("val/loss", {branch: epoch_loss}, epoch)
+	writer.add_scalars("val/learning_rate", {branch: optimizer.param_groups[0]['lr']}, epoch)
 	print(' Epoch over Loss: {:.5f}'.format(epoch_loss))
 
 	if epoch_loss < BEST_VAL_LOSS[branch]:
