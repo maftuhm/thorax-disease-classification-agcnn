@@ -30,11 +30,10 @@ def Lmax(feature):
 	output = torch.max(output, dim = 0)[0]
 	return output
 
-def Lmax_normalize(feature):
-	output = Lmax(feature)
-	max1 = torch.max(output)
-	min1 = torch.min(output)
-	output = (output - min1) / (max1 - min1)
+def Lnormalize(feature):
+	max1 = torch.max(feature)
+	min1 = torch.min(feature)
+	output = (feature - min1) / (max1 - min1)
 	return output
 
 def L3(feature):
@@ -53,7 +52,7 @@ def AttentionGenPatchs(ori_image, features_global, threshold = 0.7):
 	coordinates = []
 
 	for b in range(batch_size):
-		heatmap = L3(features_global[b])
+		heatmap = Lnormalize(L2(features_global[b]))
 
 		heatmap = F.interpolate(heatmap.unsqueeze(0).unsqueeze(0), size=(h, w), mode = 'bilinear', align_corners = True)
 		heatmap = torch.squeeze(heatmap)
