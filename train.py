@@ -55,17 +55,17 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 	running_loss = 0.
 	len_data = len(data_loader)
-	progressbar = tqdm(range(len_data))
-	random_int = torch.randint(0, len_data, (1,))
-
+	random_int = int(torch.randint(0, len_data, (1,))[0])
+	print(" display images on index", random_int)
 	batch_multiplier = exp_cfg['batch_size'][branch] // MAX_BATCH_CAPACITY[branch]
 
+	progressbar = tqdm(range(len_data))
 	for i, (images, targets) in enumerate(data_loader):
 
 		if i == random_int:
 			images_draw = {}
-			images_draw['images'] = images.item().data
-			images_draw['targets'] = targets.item().data
+			images_draw['images'] = images.detach().data
+			images_draw['targets'] = targets.detach().data
 
 		if branch == 'local':
 			with torch.no_grad():
@@ -101,13 +101,13 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		if i == random_int:
 			if branch == 'global':
-				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['scores'].item().data)
+				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['scores'].detach().data)
 			else:
 				draw_image = drawImage(images_draw['images'],
 										images_draw['targets'],
-										output['scores'].item().data,
-										output_patches['crop'].item().data,
-										output_patches['heatmap'].item().data,
+										output['scores'].detach().data,
+										output_patches['crop'].detach().data,
+										output_patches['heatmap'].detach().data,
 										output_patches['coordinate'])
 
 			writer.add_images("train/{}".format(branch), draw_image, epoch)
@@ -138,15 +138,16 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 
 	running_loss = 0.
 	len_data = len(data_loader)
-	progressbar = tqdm(range(len_data))
-	random_int = torch.randint(0, len_data, (1,))
+	random_int = int(torch.randint(0, len_data, (1,))[0])
+	print(" display images on index", random_int)
 
+	progressbar = tqdm(range(len_data))
 	for i, (images, targets) in enumerate(data_loader):
 
 		if i == random_int:
 			images_draw = {}
-			images_draw['images'] = images.item().data
-			images_draw['targets'] = targets.item().data
+			images_draw['images'] = images.detach().data
+			images_draw['targets'] = targets.detach().data
 
 		if branch == 'local':
 			output_global = test_model(images.to(device))
@@ -178,13 +179,13 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 
 		if i == random_int:
 			if branch == 'global':
-				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['scores'].item().data)
+				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['scores'].detach().data)
 			else:
 				draw_image = drawImage(images_draw['images'],
 										images_draw['targets'],
-										output['scores'].item().data,
-										output_patches['crop'].item().data,
-										output_patches['heatmap'].item().data,
+										output['scores'].detach().data,
+										output_patches['crop'].detach().data,
+										output_patches['heatmap'].detach().data,
 										output_patches['coordinate'])
 
 			writer.add_images("val/{}".format(branch), draw_image, epoch)
@@ -196,7 +197,6 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 
 	epoch_loss = float(running_loss) / float(len_data)
 	writer.add_scalars("val/loss", {branch: epoch_loss}, epoch)
-	writer.add_scalars("val/learning_rate", {branch: optimizer.param_groups[0]['lr']}, epoch)
 	print(' Epoch over Loss: {:.5f}'.format(epoch_loss))
 
 	if epoch_loss < BEST_VAL_LOSS[branch]:

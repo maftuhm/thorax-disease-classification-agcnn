@@ -206,7 +206,7 @@ def drawImage(images, target, scores, images_cropped = None, heatmaps = None, co
 		img_heatmap = torch.empty(0, dtype = images.dtype)
 		img_crop = torch.empty(0, dtype = images.dtype)
 
-	if bz > 6: bz = 6
+	if bz > 4: bz = 4
 
 	for i in range(bz):
 		img_scores = torch.cat((img_scores, draw_label_score(target[i], scores[i], size = (h, w))), 0)
