@@ -10,10 +10,12 @@ from skimage.measure import label
 
 import torch
 import torch.nn.functional as F
+import torchvision
 import torchvision.transforms as transforms
 
-CLASS_NAMES = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass', 'Nodule', 'Pneumonia',
-				'Pneumothorax', 'Consolidation', 'Edema', 'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia']
+CLASS_NAMES = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass',
+				'Nodule', 'Pneumonia', 'Pneumothorax', 'Consolidation', 'Edema',
+				'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia', 'No Finding']
 
 def L1(feature):
 	output = torch.abs(feature)
@@ -128,7 +130,7 @@ def compute_AUCs(gt, pred):
 	AUROCs = []
 	gt_np = gt.cpu().numpy()
 	pred_np = pred.cpu().numpy()
-	for i in range(14):
+	for i in range(len(CLASS_NAMES)):
 		AUROCs.append(roc_auc_score(gt_np[:, i], pred_np[:, i]))
 	return AUROCs
 
@@ -144,55 +146,81 @@ class UnNormalize(object):
 		Returns:
 			Tensor: Normalized image.
 		"""
+		out_tensor = torch.empty(0, dtype = tensor.dtype, device = tensor.device)
 		for t, m, s in zip(tensor, self.mean, self.std):
-			t.mul_(s).add_(m)
+			out_tensor = torch.cat((out_tensor, t.mul(s).add(m).unsqueeze(0)), 0)
 			# The normalize code -> t.sub_(m).div_(s)
-		return tensor
+		return out_tensor
 
-def drawImage(images, target, scores, images_cropped, heatmaps, coordinates):
+def draw_bounding_box(image, bbox, label = None):
+	img_to_draw = transforms.ToPILImage()(image)
+	draw = ImageDraw.Draw(img_to_draw)
+	draw.rectangle(bbox, outline=(0, 255, 0))
+
+	if label is not None:
+		draw.text((bbox[0] + 2, bbox[1]), label)
+
+	return transforms.ToTensor()(img_to_draw).unsqueeze(0)
+
+def draw_heatmap(image, heatmap):
+	heatmap = np.uint8(255 * heatmap.numpy())
+	heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+
+	img = cv2.cvtColor(np.uint8(255 * image.permute(1, 2, 0).numpy()), cv2.COLOR_RGB2BGR)
+	add_heatmap = cv2.cvtColor(cv2.addWeighted(img, 0.5, heatmap, 0.5, 0), cv2.COLOR_BGR2RGB)
+
+	return transforms.ToTensor()(Image.fromarray(add_heatmap)).unsqueeze(0)
+
+def draw_label_score(target, scores, size = (224, 224)):
+	new_images = Image.new('RGB', size, (255, 255, 255))
+	draw_img = ImageDraw.Draw(new_images)
+	draw_img.rectangle((0, 0, size[0], size[1]), outline=(0, 0, 0))
+
+	ground_truth_text = [CLASS_NAMES[i] for i, val in enumerate(target) if val != 0]
+	predicted_text = [(a, b) for a, b in zip(CLASS_NAMES, scores.tolist())]
+	predicted_text = sorted(predicted_text, key=lambda x: x[1], reverse=True)
+
+	for i, (text, score) in enumerate(predicted_text):
+		if text in ground_truth_text:
+			fill = (0, 0, 255)
+		else:
+			fill = (0, 0, 0)
+
+		draw_img.text((15, i * 15 + 10), text, fill = fill)
+		draw_img.text((150, i * 15 + 10), str(score)[:10], fill = fill)
+	
+	return transforms.ToTensor()(new_images).unsqueeze(0)
+
+def drawImage(images, target, scores, images_cropped = None, heatmaps = None, coordinates = None):
 	bz, c, h, w = images.shape # batch_size, channel, height, width
 
-	new_images = Image.new('RGB', (bz * w, 4 * h), (255, 255, 255))
-	
 	unnormalize = UnNormalize(
 		mean=[0.485, 0.456, 0.406],
 		std=[0.229, 0.224, 0.225]
 	)
+	img = torch.empty(0, dtype = images.dtype)
+	img_scores = torch.empty(0, dtype = images.dtype)
+
+	if images_cropped is not None:
+		img_heatmap = torch.empty(0, dtype = images.dtype)
+		img_crop = torch.empty(0, dtype = images.dtype)
 
 	for i in range(bz):
-		img = unnormalize(images[i])
-		img = transforms.ToPILImage()(img)
+		img_scores = torch.cat((img_scores, draw_label_score(target[i], scores[i], size = (h, w))), 0)
 
-		heatmap = transforms.ToPILImage()(heatmaps[i])
+		if images_cropped is not None:
+			img = torch.cat((img, draw_bounding_box(unnormalize(images[i]), coordinates[i])), 0)
+			img_heatmap = torch.cat((img_heatmap, draw_heatmap(unnormalize(images[i]), heatmaps[i])), 0)
+			img_crop = torch.cat((img_crop, unnormalize(images_cropped[i]).unsqueeze(0)), 0)
+		else:
+			img = torch.cat((img, unnormalize(images[i]).unsqueeze(0)), 0)
+	
+	if images_cropped is not None:
+		new_img = torch.cat((img, img_heatmap, img_crop, img_scores), 0)
+	else:
+		new_img = torch.cat((img, img_scores), 0)
 
-		img_patch = unnormalize(images_cropped[i])
-		img_patch = transforms.ToPILImage()(img_patch)
-
-		draw_img = ImageDraw.Draw(img)
-		draw_img.rectangle(coordinates[i], outline=(0, 255, 0))
-		# draw_img.text((coordinates[i][0] + 5, coordinates[i][1] + 5), str(labels[i]), (0, 255, 0))
-
-		new_images.paste(img, (i * w, 0))
-		new_images.paste(heatmap, (i * w, w))
-		new_images.paste(img_patch, (i * w, w * 2))
-
-		draw_img = ImageDraw.Draw(new_images)
-		draw_img.rectangle((i * w, 2 * h, (i + 1) * w, 4 * h), outline=(0, 0, 0))
-
-		ground_truth_text = [CLASS_NAMES[ind_t] for ind_t, a in enumerate(target[i]) if a != 0]
-		predicted_text = [(a, b) for a, b in zip(CLASS_NAMES, scores[i].tolist())]
-		predicted_text = sorted(predicted_text, key=lambda x: x[1], reverse=True)
-
-		for j, (text, score) in enumerate(predicted_text):
-			if text in ground_truth_text:
-				fill = (0, 0, 255)
-			else:
-				fill = (0, 0, 0)
-			draw_img.text((i * w + 15, w * 3 + j * 15 + 10), text, fill = fill)
-			draw_img.text((i * w + 150, w * 3 + j * 15 + 10), str(score)[:10], fill = fill)
-
-	new_images = transforms.ToTensor()(new_images).unsqueeze(0)
-	return new_images
+	return torchvision.utils.make_grid(new_img, nrow = bz)
 
 def write_csv(filename, data, mode = 'a'):
 	with open(filename, mode = mode, newline = '') as file: 

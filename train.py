@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-# from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 import torch.backends.cudnn as cudnn
 
 import torchvision.transforms as transforms
@@ -33,8 +33,6 @@ with open(path.join(args.exp_dir, "cfg.json")) as f:
 
 # ================= CONSTANTS ================= #
 data_dir = path.join('..', 'lung-disease-detection', 'data')
-CLASS_NAMES = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass', 'Nodule', 'Pneumonia',
-				'Pneumothorax', 'Consolidation', 'Edema', 'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia']
 
 BRANCH_NAME_LIST = ['global', 'local', 'fusion']
 BEST_VAL_LOSS = {branch: 1000 for branch in BRANCH_NAME_LIST}
@@ -47,7 +45,7 @@ MAX_BATCH_CAPACITY = {
 
 cudnn.benchmark = True
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-# writer = SummaryWriter(args.exp_dir + '/log')
+writer = SummaryWriter(args.exp_dir + '/log')
 
 def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, test_model = None):
 
@@ -57,16 +55,25 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 	running_loss = 0.
 	len_data = len(data_loader)
 	progressbar = tqdm(range(len_data))
+	random_int = torch.randint(0, len_data, (1,))
 
 	batch_multiplier = exp_cfg['batch_size'][branch] // MAX_BATCH_CAPACITY[branch]
 
 	for i, (images, targets) in enumerate(data_loader):
+
+		if i == random_int:
+			images_draw = {}
+			images_draw['images'] = images.detach().data
+			images_draw['targets'] = targets.detach().data
 
 		if branch == 'local':
 			with torch.no_grad():
 				output_global = test_model(images.to(device))
 				output_patches = AttentionGenPatchs(images.detach(), output_global['features'].cpu())
 				images = output_patches['crop']
+
+				if i == random_int: 
+					for key in output_patches: images_draw[key] = output_patches[key]
 
 			del output_global, output_patches
 			torch.cuda.empty_cache()
@@ -77,6 +84,9 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 				output_patches = AttentionGenPatchs(images.detach(), output_global['features'].cpu())
 				output_local = test_model[1](output_patches['crop'].to(device))
 				images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
+
+				if i == random_int: 
+					for key in output_patches: images_draw[key] = output_patches[key]
 
 			del output_global, output_local, output_patches
 			torch.cuda.empty_cache()
@@ -94,6 +104,19 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 			optimizer.step()
 			optimizer.zero_grad()
 
+		if i == random_int:
+			if branch == 'global':
+				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['scores'].detach().data)
+			else:
+				draw_image = drawImage(images_draw['images'],
+										images_draw['targets'],
+										output['scores'].detach().data,
+										images_draw['crop'],
+										images_draw['heatmap'],
+										images_draw['coordinate'])
+
+			writer.add_images("train/{}".format(branch), draw_image, epoch)
+
 		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch, exp_cfg['NUM_EPOCH'] - 1, loss.data.item() * batch_multiplier))
 		progressbar.update(1)
 
@@ -102,6 +125,8 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 	epoch_loss = running_loss / float(len_data)
 	print(' Epoch over Loss: {:.5f}'.format(epoch_loss))
+	writer.add_scalars("train/loss", {branch: epoch_loss}, epoch)
+	writer.add_scalars("train/learning_rate", {branch: optimizer.param_groups[0]['lr']}, epoch)
 
 	# SAVE MODEL
 	save_model(args.exp_dir, epoch, epoch_loss, model, optimizer, lr_scheduler, branch)
