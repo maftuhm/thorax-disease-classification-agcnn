@@ -1,5 +1,5 @@
 {
-	"NUM_EPOCH" : 1,
+	"NUM_EPOCH" : 50,
 	"dataset" : {
 		"resize" : [256, 256],
 		"crop" : [224, 224]
@@ -26,7 +26,7 @@
         "last_pool" : "lse",
         "backbone" : "resnet50",
         "pretrained" : true,
-        "num_classes" : 15,
+        "num_classes" : 14,
         "criterion" : "WeightedBCELoss",
         "DynamicWeightLoss" : true
     }

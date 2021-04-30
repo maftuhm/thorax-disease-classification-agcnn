@@ -15,7 +15,7 @@ import torchvision.transforms as transforms
 
 CLASS_NAMES = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass',
 				'Nodule', 'Pneumonia', 'Pneumothorax', 'Consolidation', 'Edema',
-				'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia', 'No Finding']
+				'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia']
 
 def L1(feature):
 	output = torch.abs(feature)
@@ -206,7 +206,7 @@ def drawImage(images, target, scores, images_cropped = None, heatmaps = None, co
 		img_heatmap = torch.empty(0, dtype = images.dtype)
 		img_crop = torch.empty(0, dtype = images.dtype)
 
-	if bz > 10: bz = 10
+	if bz > 6: bz = 6
 
 	for i in range(bz):
 		img_scores = torch.cat((img_scores, draw_label_score(target[i], scores[i], size = (h, w))), 0)
