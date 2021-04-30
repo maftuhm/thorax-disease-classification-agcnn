@@ -44,13 +44,14 @@ def L3(feature):
 	output = output / torch.max(output)
 	return output
 
+@torch.no_grad()
 def AttentionGenPatchs(ori_image, features_global, threshold = 0.7):
 
 	batch_size = features_global.shape[0]
 	n, c, h, w = ori_image.shape
 
 	cropped_image = torch.zeros(batch_size, c, w, h, dtype=ori_image.dtype)
-	heatmaps = torch.zeros(batch_size, c, w, h, dtype=ori_image.dtype)
+	heatmaps = torch.zeros(batch_size, w, h, dtype=ori_image.dtype)
 	coordinates = []
 
 	for b in range(batch_size):
@@ -205,6 +206,8 @@ def drawImage(images, target, scores, images_cropped = None, heatmaps = None, co
 		img_heatmap = torch.empty(0, dtype = images.dtype)
 		img_crop = torch.empty(0, dtype = images.dtype)
 
+	if bz > 10: bz = 10
+
 	for i in range(bz):
 		img_scores = torch.cat((img_scores, draw_label_score(target[i], scores[i], size = (h, w))), 0)
 
@@ -220,7 +223,7 @@ def drawImage(images, target, scores, images_cropped = None, heatmaps = None, co
 	else:
 		new_img = torch.cat((img, img_scores), 0)
 
-	return torchvision.utils.make_grid(new_img, nrow = bz)
+	return torchvision.utils.make_grid(new_img, nrow = bz).unsqueeze(0)
 
 def write_csv(filename, data, mode = 'a'):
 	with open(filename, mode = mode, newline = '') as file: 

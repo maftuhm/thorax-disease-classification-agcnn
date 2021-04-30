@@ -20,7 +20,7 @@ from utils import *
 def parse_args():
 	parser = argparse.ArgumentParser(description='AG-CNN')
 	parser.add_argument('--use', type=str, default='train', help='use for what (train or test)')
-	parser.add_argument("--exp_dir", type=str, default="./experiments/exp14")
+	parser.add_argument("--exp_dir", type=str, default="./experiments/exp15")
 	parser.add_argument("--resume", "-r", action="store_true")
 	args = parser.parse_args()
 	return args
@@ -36,6 +36,7 @@ data_dir = path.join('..', 'lung-disease-detection', 'data')
 
 BRANCH_NAME_LIST = ['global', 'local', 'fusion']
 BEST_VAL_LOSS = {branch: 1000 for branch in BRANCH_NAME_LIST}
+# exp 14 best local 0.92933
 
 MAX_BATCH_CAPACITY = {
 	'global' : 20,
