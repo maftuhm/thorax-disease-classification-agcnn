@@ -20,7 +20,7 @@ from utils import *
 def parse_args():
 	parser = argparse.ArgumentParser(description='AG-CNN')
 	parser.add_argument('--use', type=str, default='train', help='use for what (train or test)')
-	parser.add_argument("--exp_dir", type=str, default="./experiments/exp15")
+	parser.add_argument("--exp_dir", type=str, default="./experiments/exp16")
 	parser.add_argument("--resume", "-r", action="store_true")
 	args = parser.parse_args()
 	return args
