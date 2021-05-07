@@ -13,13 +13,16 @@ class ResAttCheXNet(nn.Module):
             self.backbone = ResNet50(pretrained = pretrained,
                                     num_classes = num_classes,
                                     last_pool = last_pool,
-                                    lse_pool_controller = lse_pool_controller)
+                                    lse_pool_controller = lse_pool_controller,
+                                    **kwargs)
 
         elif backbone == 'densenet121':
             self.backbone = DenseNet121(pretrained = pretrained,
                                         num_classes = num_classes,
                                         last_pool = last_pool,
-                                        lse_pool_controller = lse_pool_controller)
+                                        lse_pool_controller = lse_pool_controller,
+                                        memory_efficient = True,
+                                        **kwargs)
         else:
             raise Exception("backbone must be resnet50 or densenet121")
 
@@ -95,19 +98,6 @@ class FusionNet(nn.Module):
         }
 
         return output
-
-class LSEPool2d(nn.Module):
-    def __init__(self, r = 10):
-        super(LSEPool2d, self).__init__()
-        self.r = r
-        self.maxpool = nn.MaxPool2d(kernel_size = 7, stride = 1)
-
-    def forward(self, x):
-        xmaxpool = torch.abs(x)
-        xmaxpool = self.maxpool(xmaxpool)
-        xpool = (1 / (x.shape[-1] * x.shape[-2])) * torch.sum(torch.exp(self.r * (x - xmaxpool)), dim = (-2, -1))
-        xpool  = xmaxpool + (1 / self.r) * torch.log(xpool).unsqueeze(-1).unsqueeze(-1)
-        return xpool
 
 def weighted_binary_cross_entropy(sigmoid_x, targets, pos_weight, neg_weight, weight=None, size_average=True, reduce=True):
     """

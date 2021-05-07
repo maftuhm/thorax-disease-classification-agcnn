@@ -254,9 +254,12 @@ def ResNet50(pretrained = True, num_classes = 14, last_pool = 'lse', lse_pool_co
         state_dict = load_state_dict_from_url(model_urls['resnet50'], progress = True)
 
         # Subsample fc with size [1000, 2048] to [num_classes, 2048] by unfold
-        step_fold = (1000 // model.state_dict()['fc.weight'].size(0)) + 1
-        state_dict['fc.weight'] = state_dict['fc.weight'].unfold(0, 1, step_fold).flatten(1)  # (num_classes, 2048)
-        state_dict['fc.bias'] = state_dict['fc.bias'].unfold(0, 1, step_fold).flatten()  # (num_classes)
+        # step_fold = (1000 // model.state_dict()['fc.weight'].size(0)) + 1
+        # state_dict['fc.weight'] = state_dict['fc.weight'].unfold(0, 1, step_fold).flatten(1)  # (num_classes, 2048)
+        # state_dict['fc.bias'] = state_dict['fc.bias'].unfold(0, 1, step_fold).flatten()  # (num_classes)
+
+        state_dict['fc.weight'] = model.state_dict()['fc.weight'].data
+        state_dict['fc.bias'] = model.state_dict()['fc.bias'].data
 
         model.load_state_dict(state_dict)
 

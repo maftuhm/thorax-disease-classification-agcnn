@@ -243,9 +243,11 @@ def DenseNet121(pretrained = True, num_classes = 14, last_pool = 'lse', lse_pool
                 del state_dict[key]
 
         # Subsample fc with size [1000, 1028] to [num_classes, 1028] by unfold
-        step_fold = (1000 // model.state_dict()['classifier.weight'].size(0)) + 1
-        state_dict['classifier.weight'] = state_dict['classifier.weight'].unfold(0, 1, step_fold).flatten(1)  # (num_classes, 1024)
-        state_dict['classifier.bias'] = state_dict['classifier.bias'].unfold(0, 1, step_fold).flatten()  # (num_classes)
+        # step_fold = (1000 // model.state_dict()['classifier.weight'].size(0)) + 1
+        # state_dict['classifier.weight'] = state_dict['classifier.weight'].unfold(0, 1, step_fold).flatten(1)  # (num_classes, 1024)
+        # state_dict['classifier.bias'] = state_dict['classifier.bias'].unfold(0, 1, step_fold).flatten()  # (num_classes)
+        state_dict['classifier.weight'] = model.state_dict()['classifier.weight'].data
+        state_dict['classifier.bias'] = model.state_dict()['classifier.bias'].data
 
         model.load_state_dict(state_dict)
 

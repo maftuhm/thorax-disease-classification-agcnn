@@ -64,13 +64,13 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		if i == random_int:
 			images_draw = {}
-			images_draw['images'] = images.detach().data
-			images_draw['targets'] = targets.detach().data
+			images_draw['images'] = images.data
+			images_draw['targets'] = targets.data
 
 		if branch == 'local':
 			with torch.no_grad():
 				output_global = test_model(images.to(device))
-				output_patches = AttentionGenPatchs(images.detach(), output_global['features'].cpu())
+				output_patches = AttentionGenPatchs(images.data, output_global['features'].data.cpu(), exp_cfg['threshold'])
 				images = output_patches['crop']
 
 			del output_global
@@ -79,7 +79,7 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 		elif branch == 'fusion':
 			with torch.no_grad():
 				output_global = test_model[0](images.to(device))
-				output_patches = AttentionGenPatchs(images.detach(), output_global['features'].cpu())
+				output_patches = AttentionGenPatchs(images.data, output_global['features'].data.cpu(), exp_cfg['threshold'])
 				output_local = test_model[1](output_patches['crop'].to(device))
 				images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
 
@@ -101,13 +101,13 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		if i == random_int:
 			if branch == 'global':
-				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['scores'].detach().data)
+				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['scores'].data)
 			else:
 				draw_image = drawImage(images_draw['images'],
 										images_draw['targets'],
-										output['scores'].detach().data,
-										output_patches['crop'].detach().data,
-										output_patches['heatmap'].detach().data,
+										output['scores'].data,
+										output_patches['crop'].data,
+										output_patches['heatmap'].data,
 										output_patches['coordinate'])
 
 			writer.add_images("train/{}".format(branch), draw_image, epoch)
@@ -146,12 +146,12 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 
 		if i == random_int:
 			images_draw = {}
-			images_draw['images'] = images.detach().data
-			images_draw['targets'] = targets.detach().data
+			images_draw['images'] = images.data
+			images_draw['targets'] = targets.data
 
 		if branch == 'local':
 			output_global = test_model(images.to(device))
-			output_patches = AttentionGenPatchs(images.detach(), output_global['features'].cpu())
+			output_patches = AttentionGenPatchs(images.data, output_global['features'].data.cpu(), exp_cfg['threshold'])
 			images = output_patches['crop']
 
 			del output_global
@@ -159,7 +159,7 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 		
 		elif branch == 'fusion':
 			output_global = test_model[0](images.to(device))
-			output_patches = AttentionGenPatchs(images.detach(), output_global['features'].cpu())
+			output_patches = AttentionGenPatchs(images.data, output_global['features'].data.cpu(), exp_cfg['threshold'])
 			output_local = test_model[1](output_patches['crop'].to(device))
 			images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
 
@@ -168,24 +168,24 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 
 		images = images.to(device)
 		targets = targets.to(device)
-		gt = torch.cat((gt, targets.detach().cpu()), 0)
+		gt = torch.cat((gt, targets.data.cpu()), 0)
 
 		output = model(images, targets)
-		pred = torch.cat((pred, output['scores'].detach().cpu()), 0)
+		pred = torch.cat((pred, output['scores'].data.cpu()), 0)
 
-		loss = output['loss'].detach().item()
+		loss = output['loss'].data.item()
 
 		running_loss += loss
 
 		if i == random_int:
 			if branch == 'global':
-				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['scores'].detach().data)
+				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['scores'].data)
 			else:
 				draw_image = drawImage(images_draw['images'],
 										images_draw['targets'],
-										output['scores'].detach().data,
-										output_patches['crop'].detach().data,
-										output_patches['heatmap'].detach().data,
+										output['scores'].data,
+										output_patches['crop'].data,
+										output_patches['heatmap'].data,
 										output_patches['coordinate'])
 
 			writer.add_images("val/{}".format(branch), draw_image, epoch)
