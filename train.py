@@ -211,7 +211,7 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 	print("|=======================================|")
 	print("|\t\t  AUROC\t\t\t|")
 	print("|=======================================|")
-	print("|\t      global branch\t\t|")
+	print("|\t      " + branch + " branch\t\t|")
 	print("|---------------------------------------|")
 	for i in range(len(CLASS_NAMES)):
 		if len(CLASS_NAMES[i]) < 6:

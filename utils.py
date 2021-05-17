@@ -15,7 +15,7 @@ import torchvision.transforms as transforms
 
 CLASS_NAMES = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass',
 				'Nodule', 'Pneumonia', 'Pneumothorax', 'Consolidation', 'Edema',
-				'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia']
+				'Emphysema', 'Fibrosis', 'Pleural_Thickening', 'Hernia', 'No Finding']
 
 def L1(feature):
 	output = torch.abs(feature)
@@ -65,19 +65,19 @@ def AttentionGenPatchs(ori_image, features_global, threshold = 0.7):
 		heatmap = selectMaxConnect(heatmap)
 
 		where = torch.from_numpy(np.argwhere(heatmap == 1))
-		if len(where) < 1:
-			xmin, xmax, ymin, ymax = 0, w, 0, h
-			cropped_image[b] = ori_image[b]
-		else:
-			xmin = int(torch.min(where, dim = 0)[0][0])
-			xmax = int(torch.max(where, dim = 0)[0][0])
-			ymin = int(torch.min(where, dim = 0)[0][1])
-			ymax = int(torch.max(where, dim = 0)[0][1])
+		# if len(where) < 1:
+		# 	xmin, xmax, ymin, ymax = 0, w, 0, h
+		# 	cropped_image[b] = ori_image[b]
+		# else:
+		xmin = int(torch.min(where, dim = 0)[0][0])
+		xmax = int(torch.max(where, dim = 0)[0][0])
+		ymin = int(torch.min(where, dim = 0)[0][1])
+		ymax = int(torch.max(where, dim = 0)[0][1])
 
-			img_crop = ori_image[b][:, xmin:xmax, ymin:ymax]
-			cropped_image[b] = F.interpolate(img_crop.unsqueeze(0), size=(h, w), mode = 'bilinear', align_corners = True).squeeze(0)
+		img_crop = ori_image[b][:, xmin:xmax, ymin:ymax]
+		cropped_image[b] = F.interpolate(img_crop.unsqueeze(0), size=(h, w), mode = 'bilinear', align_corners = True).squeeze(0)
 
-		coordinates.append((xmin, ymin, xmax, ymax))
+		coordinates.append([xmin, ymin, xmax, ymax])
 
 	output = {
 		'crop' : cropped_image,
