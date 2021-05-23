@@ -260,7 +260,7 @@ def main():
 	test_loader = DataLoader(dataset = test_dataset, batch_size = exp_cfg['batch_size']['global'] // 2, shuffle = False, num_workers = 4, pin_memory = True)
 
 	# ================= CREATE WEIGHT ================= #
-	count_train_labels = torch.tensor(train_dataset.labels, dtype=torch.float32).sum(axis=0)
+	count_train_labels = torch.tensor(train_dataset.labels, dtype=torch.float32, device=device).sum(axis=0)
 	weight_train = count_train_labels.max() / count_train_labels
 
 	criterion = nn.BCEWithLogitsLoss(pos_weight = weight_train)
