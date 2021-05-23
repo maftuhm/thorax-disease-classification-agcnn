@@ -55,7 +55,7 @@ def AttentionGenPatchs(ori_image, features_global, threshold = 0.7):
 	coordinates = []
 
 	for b in range(batch_size):
-		heatmap = Lnormalize(L2(features_global[b]))
+		heatmap = Lmax(features_global[b])
 
 		heatmap = F.interpolate(heatmap.unsqueeze(0).unsqueeze(0), size=(h, w), mode = 'bilinear', align_corners = True).squeeze()
 		heatmaps[b] = heatmap
