@@ -251,13 +251,13 @@ def main():
 
 	# ================= LOAD DATASET ================= #
 	train_dataset = ChestXrayDataSet(data_dir = data_dir,split = 'train', transform = transform_train)
-	train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 4, pin_memory = True)
+	train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY['global'], shuffle = True, num_workers = 4, pin_memory = True)
 
 	val_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'val', transform = transform_test)
-	val_loader = DataLoader(dataset = val_dataset, batch_size = exp_cfg['batch_size'][branch_name] // 2, shuffle = False, num_workers = 4, pin_memory = True)
+	val_loader = DataLoader(dataset = val_dataset, batch_size = exp_cfg['batch_size']['global'] // 2, shuffle = False, num_workers = 4, pin_memory = True)
 
 	test_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'test', transform = transform_test)
-	test_loader = DataLoader(dataset = test_dataset, batch_size = exp_cfg['batch_size'][branch_name] // 2, shuffle = False, num_workers = 4, pin_memory = True)
+	test_loader = DataLoader(dataset = test_dataset, batch_size = exp_cfg['batch_size']['global'] // 2, shuffle = False, num_workers = 4, pin_memory = True)
 
 	# ================= CREATE WEIGHT ================= #
 	count_train_labels = torch.tensor(train_dataset.labels, dtype=torch.float32).sum(axis=0)
