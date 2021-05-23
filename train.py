@@ -250,13 +250,13 @@ def main():
 	FusionModel = FusionNet(**exp_cfg['net'])
 
 	# ================= LOAD DATASET ================= #
-	train_dataset = ChestXrayDataSet(data_dir = data_dir,split = 'train', transform = transform_train)
+	train_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'train', num_classes = exp_cfg['net']['num_classes'], transform = transform_train)
 	train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY['global'], shuffle = True, num_workers = 4, pin_memory = True)
 
-	val_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'val', transform = transform_test)
+	val_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'val', num_classes = exp_cfg['net']['num_classes'], transform = transform_test)
 	val_loader = DataLoader(dataset = val_dataset, batch_size = exp_cfg['batch_size']['global'] // 2, shuffle = False, num_workers = 4, pin_memory = True)
 
-	test_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'test', transform = transform_test)
+	test_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'test', num_classes = exp_cfg['net']['num_classes'], transform = transform_test)
 	test_loader = DataLoader(dataset = test_dataset, batch_size = exp_cfg['batch_size']['global'] // 2, shuffle = False, num_workers = 4, pin_memory = True)
 
 	# ================= CREATE WEIGHT ================= #
