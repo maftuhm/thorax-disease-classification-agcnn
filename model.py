@@ -4,8 +4,9 @@ import torch.nn.functional as F
 from models import ResNet50, DenseNet121
 
 class ResAttCheXNet(nn.Module):
-    def __init__(self, last_pool = 'lse', lse_pool_controller = 5, backbone = 'resnet50', pretrained = True,
-                num_classes = 14, criterion = 'WeightedBCELoss', DynamicWeightLoss = True, **kwargs):
+    def __init__(self, last_pool = 'lse', lse_pool_controller = 5, 
+                backbone = 'resnet50', pretrained = True, 
+                num_classes = 14, **kwargs):
         super(ResAttCheXNet, self).__init__()
 
         # ----------------- Backbone -----------------
@@ -26,52 +27,22 @@ class ResAttCheXNet(nn.Module):
         else:
             raise Exception("backbone must be resnet50 or densenet121")
 
-        # ----------------- Loss Function -----------------
-        if criterion == 'WeightedBCELoss':
-            self.criterion = WeightedBCELoss(PosNegWeightIsDynamic = DynamicWeightLoss)
-        elif criterion == 'BCELoss':
-            self.criterion = nn.BCELoss()
-        else:
-            raise Exception("Loss function must be BCELoss or WeightedBCELoss")
-
-    def forward(self, image, label = None):
+    def forward(self, image):
         out, features, pool = self.backbone(image)
 
-        # residual_features = self.discriminative_features(features, self.attention(features))
-        # scores_residual = self.fc_residual(torch.flatten(residual_features, 1))
-
-        if label is not None:
-            loss = self.criterion(out, label)
-            # loss_residual = self.criterion(scores_residual, label)
-        else:
-            loss = torch.tensor(0, dtype=image.dtype, device=image.device)
-            # loss_residual = torch.tensor(0, dtype=image.dtype, device=image.device)
-
         output = {
-            'scores' : out,
-            # 'scores_residual' : scores_residual,
+            'out' : out,
             'features' : features,
             'pool' : pool,
-            'loss' : loss,
-            # 'loss_residual' : loss_residual
         }
 
         return output
 
 
 class FusionNet(nn.Module):
-    def __init__(self, backbone = 'resnet50', num_classes = 14,
-                criterion = 'WeightedBCELoss', DynamicWeightLoss = True, **kwargs):
+    def __init__(self, backbone = 'resnet50', num_classes = 14, **kwargs):
 
         super(FusionNet, self).__init__()
-
-        # ----------------- Loss Function -----------------
-        if criterion == 'WeightedBCELoss':
-            self.criterion = WeightedBCELoss(PosNegWeightIsDynamic = DynamicWeightLoss)
-        elif criterion == 'BCELoss':
-            self.criterion = nn.BCELoss()
-        else:
-            raise Exception("Loss function must be BCELoss or WeightedBCELoss")
 
         # ----------------- Backbone -----------------
         if backbone == 'resnet50':
@@ -81,23 +52,8 @@ class FusionNet(nn.Module):
         else:
             raise Exception("backbone must be resnet50 or densenet121")
 
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, pool, label = None):
-        scores = self.fc(pool)
-        scores = self.sigmoid(scores)
-
-        if label is not None:
-            loss = self.criterion(scores, label)
-        else:
-            loss = torch.tensor(0, dtype=pool.dtype, device=pool.device)
-
-        output = {
-            'scores' : scores,
-            'loss' : loss
-        }
-
-        return output
+    def forward(self, pool):
+        return {'out': self.fc(pool)}
 
 def weighted_binary_cross_entropy(sigmoid_x, targets, pos_weight, neg_weight, weight=None, size_average=True, reduce=True):
     """

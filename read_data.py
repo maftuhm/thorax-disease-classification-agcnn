@@ -5,7 +5,7 @@ import os
 
 
 class ChestXrayDataSet(Dataset):
-    def __init__(self, data_dir, split, transform=None):
+    def __init__(self, data_dir, split, num_classes=14, transform=None):
         """
         Args:
             data_dir: path to image directory.
@@ -21,7 +21,7 @@ class ChestXrayDataSet(Dataset):
             for line in f:
                 items = line.split()
                 image_name= items[0]
-                label = items[1:]
+                label = items[1:num_classes+1]
                 label = [int(i) for i in label]
                 image_name = os.path.join(data_dir, 'images', image_name)
                 image_names.append(image_name)

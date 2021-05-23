@@ -26,8 +26,7 @@
 		"lse_pool_controller" : 10,
 		"backbone" : "resnet50",
 		"pretrained" : true,
-		"num_classes" : 15,
-		"criterion" : "BCELoss",
-		"DynamicWeightLoss" : true
-	}
+		"num_classes" : 14
+	},
+	"criterion" : "BCEWithLogitsLoss"
 }

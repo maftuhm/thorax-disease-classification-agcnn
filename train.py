@@ -35,7 +35,7 @@ with open(path.join(args.exp_dir, "cfg.json")) as f:
 data_dir = path.join('..', 'lung-disease-detection', 'data')
 
 BRANCH_NAME_LIST = ['global', 'local', 'fusion']
-BEST_VAL_LOSS = {branch: 1000 for branch in BRANCH_NAME_LIST}
+BEST_AUROCs = {branch: -1000 for branch in BRANCH_NAME_LIST}
 # exp 14 best local 0.92933
 
 MAX_BATCH_CAPACITY = {
@@ -48,7 +48,7 @@ cudnn.benchmark = True
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 writer = SummaryWriter(args.exp_dir + '/log')
 
-def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, test_model = None):
+def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, criterion, test_model = None):
 
 	model.train()
 	optimizer.zero_grad()
@@ -89,9 +89,9 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 		images = images.to(device)
 		targets = targets.to(device)
 
-		output = model(images, targets)
+		output = model(images)
 
-		loss = output['loss'] / batch_multiplier
+		loss = criterion(output['out'], targets) / batch_multiplier
 		running_loss += loss.data.item() * batch_multiplier
 
 		loss.backward()
@@ -101,11 +101,11 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		if i == random_int:
 			if branch == 'global':
-				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['scores'].data)
+				draw_image = drawImage(images_draw['images'], images_draw['targets'], F.sigmoid(output['out']).data)
 			else:
 				draw_image = drawImage(images_draw['images'],
 										images_draw['targets'],
-										output['scores'].data,
+										F.sigmoid(output['out']).data,
 										output_patches['crop'].data,
 										output_patches['heatmap'].data,
 										output_patches['coordinate'])
@@ -170,44 +170,40 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 		targets = targets.to(device)
 		gt = torch.cat((gt, targets.data.cpu()), 0)
 
-		output = model(images, targets)
-		pred = torch.cat((pred, output['scores'].data.cpu()), 0)
-
-		loss = output['loss'].data.item()
-
-		running_loss += loss
+		output = model(images)
+		pred = torch.cat((pred, F.sigmoid(output['out']).data.cpu()), 0)
 
 		if i == random_int:
 			if branch == 'global':
-				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['scores'].data)
+				draw_image = drawImage(images_draw['images'], images_draw['targets'], F.sigmoid(output['out']).data)
 			else:
 				draw_image = drawImage(images_draw['images'],
 										images_draw['targets'],
-										output['scores'].data,
+										F.sigmoid(output['out']).data,
 										output_patches['crop'].data,
 										output_patches['heatmap'].data,
 										output_patches['coordinate'])
 
 			writer.add_images("val/{}".format(branch), draw_image, epoch)
 
-		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch,  exp_cfg['NUM_EPOCH'] - 1, loss))
+		progressbar.set_description(" Epoch: [{}/{}]".format(epoch,  exp_cfg['NUM_EPOCH'] - 1))
 		progressbar.update(1)
 
 	progressbar.close()
 
-	epoch_loss = float(running_loss) / float(len_data)
-	writer.add_scalars("val/loss", {branch: epoch_loss}, epoch)
-	print(' Epoch over Loss: {:.5f}'.format(epoch_loss))
+	AUROCs = compute_AUCs(gt, pred)
+	AUROCs_mean = np.array(AUROCs).mean()
 
-	if epoch_loss < BEST_VAL_LOSS[branch]:
-		BEST_VAL_LOSS[branch] = epoch_loss
+	writer.add_scalars("val/AUROCs", {branch: AUROCs_mean}, epoch)
+
+	if AUROCs_mean > BEST_AUROCs[branch]:
+		BEST_AUROCs[branch] = AUROCs_mean
 		save_name = path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_' + branch + '.pth')
 		copy_name = os.path.join(args.exp_dir, args.exp_dir.split('/')[-1] + '_' + branch + '_best.pth')
 		shutil.copyfile(save_name, copy_name)
 		print(" Best model is saved: {}".format(copy_name))
 
-	AUROCs = compute_AUCs(gt, pred)
-	print(' Best Loss: {:.5f}'.format(BEST_VAL_LOSS[branch]))
+	print(' Best AUROCs: {:.5f}'.format(BEST_AUROCs[branch]))
 	print("|=======================================|")
 	print("|\t\t  AUROC\t\t\t|")
 	print("|=======================================|")
@@ -222,7 +218,7 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 			print("| {}\t\t|".format(CLASS_NAMES[i]), end="")
 		print("  {:.10f}\t|".format(AUROCs[i]))
 	print("|---------------------------------------|")
-	print("| Average\t\t|  {:.10f}\t|".format(np.array(AUROCs).mean()))
+	print("| Average\t\t|  {:.10f}\t|".format(AUROCs_mean))
 	print("|=======================================|")
 	print()
 
@@ -253,18 +249,24 @@ def main():
 	LocalModel = ResAttCheXNet(**exp_cfg['net'])
 	FusionModel = FusionNet(**exp_cfg['net'])
 
+	# ================= LOAD DATASET ================= #
+	train_dataset = ChestXrayDataSet(data_dir = data_dir,split = 'train', transform = transform_train)
+	train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 4, pin_memory = True)
+
+	val_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'val', transform = transform_test)
+	val_loader = DataLoader(dataset = val_dataset, batch_size = exp_cfg['batch_size'][branch_name] // 2, shuffle = False, num_workers = 4, pin_memory = True)
+
+	test_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'test', transform = transform_test)
+	test_loader = DataLoader(dataset = test_dataset, batch_size = exp_cfg['batch_size'][branch_name] // 2, shuffle = False, num_workers = 4, pin_memory = True)
+
+	# ================= CREATE WEIGHT ================= #
+	count_train_labels = torch.tensor(train_dataset.labels, dtype=torch.float32).sum(axis=0)
+	weight_train = count_train_labels.max() / count_train_labels
+
+	criterion = nn.BCEWithLogitsLoss(pos_weight = weight_train)
+
 	for branch_name in BRANCH_NAME_LIST:
 		print(" Start training " + branch_name + " branch...")
-
-		# ================= LOAD DATASET ================= #
-		train_dataset = ChestXrayDataSet(data_dir = data_dir,split = 'train', transform = transform_train)
-		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 4, pin_memory = True)
-
-		val_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'val', transform = transform_test)
-		val_loader = DataLoader(dataset = val_dataset, batch_size = exp_cfg['batch_size'][branch_name] // 2, shuffle = False, num_workers = 4, pin_memory = True)
-
-		test_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'test', transform = transform_test)
-		test_loader = DataLoader(dataset = test_dataset, batch_size = exp_cfg['batch_size'][branch_name] // 2, shuffle = False, num_workers = 4, pin_memory = True)
 
 		if branch_name == 'global':
 			Model = GlobalModel.to(device)
@@ -302,7 +304,7 @@ def main():
 				optimizer.load_state_dict(save_dict['optim'])
 				lr_scheduler.load_state_dict(save_dict['lr_scheduler'])
 				start_epoch = save_dict['epoch']
-				BEST_VAL_LOSS[branch_name] = save_dict['loss']
+				# BEST_AUROCs[branch_name] = save_dict['loss']
 				print(" Loaded " + branch_name + " branch model checkpoint from epoch " + str(start_epoch))
 				start_epoch += 1
 			else:
@@ -313,7 +315,7 @@ def main():
 
 		for epoch in range(start_epoch, exp_cfg['NUM_EPOCH']):
 
-			train_one_epoch(epoch, branch_name, Model, optimizer, lr_scheduler, train_loader, TestModel)
+			train_one_epoch(epoch, branch_name, Model, optimizer, lr_scheduler, train_loader, criterion, TestModel)
 			val_one_epoch(epoch, branch_name, Model, val_loader, TestModel)
 
 		print(" Training " + branch_name + " branch done.")

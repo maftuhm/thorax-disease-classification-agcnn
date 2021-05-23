@@ -206,7 +206,7 @@ class DenseNet(nn.Module):
         out = self.last_pool(out)
         flatten_pool = torch.flatten(out, 1)
         out = self.classifier(flatten_pool)
-        out = F.sigmoid(out)
+        # scores = F.sigmoid(out)
         return out, features, flatten_pool
 
 class LSEPool2d(nn.Module):
