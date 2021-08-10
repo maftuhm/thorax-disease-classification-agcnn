@@ -5,6 +5,7 @@
 			"last_pool" : "max"
 		},
 		"branch" : ["global"],
+		"optimizer" : "SGD",
 		"loss" : "BCELoss"
 	},
 	"exp1" : {
@@ -13,78 +14,91 @@
 			"last_pool" : "max"
 		},
 		"branch" : ["global"],
-		"loss" : "WeightedBCELoss"
+		"optimizer" : "Adam",
+		"loss" : "BCELoss"
 	},
 	"exp2" : {
+		"net" : {
+			"backbone" : "resnet50",
+			"last_pool" : "max"
+		},
+		"branch" : ["global"],
+		"optimizer" : "?",
+		"loss" : "WeightedBCELoss"
+	},
+	"exp3" : {
 		"net" : {
 			"backbone" : "resnet50",
 			"last_pool" : "lse",
 			"lse_pool_controller" : 10
 		},
 		"branch" : ["global"],
+		"optimizer" : "?",
 		"loss" : "?"
 	},
-	"exp3" : {
+	"exp4" : {
 		"net" : {
 			"backbone" : "resnet50",
 			"last_pool" : "avg"
 		},
 		"branch" : ["global"],
+		"optimizer" : "?",
 		"loss" : "?"
 	},
-	"exp4" : {
+	"exp5" : {
 		"net" : {
 			"backbone" : "densenet121",
 			"last_pool" : "?"
 		},
 		"branch" : ["global"],
-		"loss" : "?"
-	},
-	"exp5" : {
-		"net" : {
-			"backbone" : "resnet50",
-			"last_pool" : "lse",
-			"lse_pool_controller" : 8
-		},
-		"branch" : ["global"],
+		"optimizer" : "?",
 		"loss" : "?"
 	},
 	"exp6" : {
 		"net" : {
 			"backbone" : "resnet50",
 			"last_pool" : "lse",
-			"lse_pool_controller" : 12
+			"lse_pool_controller" : 8
 		},
 		"branch" : ["global"],
+		"optimizer" : "?",
 		"loss" : "?"
 	},
 	"exp7" : {
-		"net" : "?",
-		"branch" : ["local", "fusion"],
-		"loss" : "?",
-		"L_function" : "?",
-		"threshold" : 0.7
+		"net" : {
+			"backbone" : "resnet50",
+			"last_pool" : "lse",
+			"lse_pool_controller" : 12
+		},
+		"branch" : ["global"],
+		"optimizer" : "?",
+		"loss" : "?"
 	},
 	"exp8" : {
-		"net" : "?",
+		"net" : "exp0",
 		"branch" : ["local", "fusion"],
-		"loss" : "?",
-		"L_function" : "?",
-		"threshold" : 0.6
+		"L_function" : "Lmax",
+		"threshold" : 0.7
 	},
 	"exp9" : {
 		"net" : "?",
 		"branch" : ["local", "fusion"],
 		"L_function" : "?",
-		"threshold" : 0.8
+		"threshold" : 0.6
 	},
 	"exp10" : {
+		"net" : "?",
+		"branch" : ["local", "fusion"],
+		"L_function" : "?",
+		"threshold" : 0.8
+	},
+	"exp11" : {
 		"net" : "?",
 		"branch" : ["local", "fusion"],
 		"L_function" : "L1",
 		"threshold" : -1
 	},
-	"exp11" : {
+	"exp12" : {
 		"net" : "?",
 		"branch" : ["local", "fusion"],
 		"L_function" : "L2",

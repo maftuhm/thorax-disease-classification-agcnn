@@ -14,6 +14,12 @@
 			"lr" : 0.01,
 			"momentum" : 0.9,
 			"weight_decay" : 0.0001
+		},
+		"Adam" : {
+			"lr": 0.001,
+			"betas": [0.9, 0.999], 
+			"eps": 1e-08, 
+			"weight_decay" : 0
 		}
 	},
 	"lr_scheduler" : {

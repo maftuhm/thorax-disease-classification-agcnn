@@ -19,12 +19,12 @@ CLASS_NAMES = [ 'Atelectasis', 'Cardiomegaly', 'Effusion', 'Infiltration', 'Mass
 
 def L1(feature):
 	output = torch.abs(feature)
-	output = torch.sum(output, axis = 0)
+	output = torch.sum(output, axis = 0) / 2048
 	return output
 
 def L2(feature):
 	output = torch.sum(feature ** 2, axis = 0)
-	output = torch.sqrt(output)
+	output = torch.sqrt(output) / 2048
 	return output
 
 def Lmax(feature):

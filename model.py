@@ -58,8 +58,12 @@ class FusionNet(nn.Module):
         else:
             raise Exception("backbone must be resnet50 or densenet121")
 
+        self.sigmoid = nn.Sigmoid()
+
     def forward(self, pool):
-        return {'out': self.fc(pool)}
+        out = self.fc(pool)
+        out = self.sigmoid(out)
+        return {'out': out}
 
 def weighted_binary_cross_entropy(sigmoid_x, targets, pos_weight, neg_weight, weight=None, size_average=True, reduce=True):
     """

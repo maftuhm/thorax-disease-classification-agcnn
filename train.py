@@ -3,7 +3,7 @@ import os.path as path
 import json
 import argparse
 from tqdm import tqdm
-import time
+from datetime import datetime
 
 import torch
 import torch.nn as nn
@@ -37,14 +37,31 @@ with open(path.join(args.exp_dir, "cfg_train.json")) as f:
 	exp_configs = json.load(f)
 	exp_config = exp_configs[args.exp_num]
 
+if 'local' in exp_config['branch']:
+	del exp_configs[exp_config['net']]['branch']
+
+	if exp_config['net'] != '?':
+		global_branch_exp = exp_config['net']
+		global_branch = exp_configs[exp_config['net']]
+		exp_config.update(global_branch)
+	else:
+		raise Exception("experiment number global branch must be choosen")
+
+
+config['optimizer'] = {exp_config['optimizer'] : config['optimizer'][exp_config['optimizer']]}
+del exp_config['optimizer']
+
+config.update(exp_config)
+del exp_config, exp_configs
+
 exp_dir_num = path.join(args.exp_dir, args.exp_num)
 os.makedirs(exp_dir_num, exist_ok=True)
 
-
 # ================= CONSTANTS ================= #
+# data_dir = path.join('D:/', 'Data', 'data')
 data_dir = path.join('..', 'lung-disease-detection', 'data')
 
-BRANCH_NAMES = exp_config['branch']
+BRANCH_NAMES = config['branch']
 BEST_AUROCs = {branch: -1000 for branch in BRANCH_NAMES}
 
 MAX_BATCH_CAPACITY = {
@@ -62,10 +79,17 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 	model.train()
 	optimizer.zero_grad()
 
+	if test_model != None:
+		if type(test_model) == tuple:
+			test_model[0].eval()
+			test_model[1].eval()
+		else:
+			test_model.eval()
+
 	running_loss = 0.
 	len_data = len(data_loader)
 	random_int = int(torch.randint(0, len_data, (1,))[0])
-	print(" display images on index", random_int)
+	print(" Display images on index", random_int)
 	batch_multiplier = config['batch_size'][branch] // MAX_BATCH_CAPACITY[branch]
 
 	progressbar = tqdm(range(len_data))
@@ -73,27 +97,21 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		if i == random_int:
 			images_draw = {}
-			images_draw['images'] = images.data
-			images_draw['targets'] = targets.data
+			images_draw['images'] = images.detach()
+			images_draw['targets'] = targets.detach()
 
 		if branch == 'local':
 			with torch.no_grad():
 				output_global = test_model(images.to(device))
-				output_patches = AttentionGenPatchs(images.data, output_global['features'].data.cpu(), exp_config['threshold'], exp_config['L_function'])
+				output_patches = AttentionGenPatchs(images.detach(), output_global['features'].detach().cpu(), config['threshold'], config['L_function'])
 				images = output_patches['crop']
-
-			del output_global
-			torch.cuda.empty_cache()
 		
 		elif branch == 'fusion':
 			with torch.no_grad():
 				output_global = test_model[0](images.to(device))
-				output_patches = AttentionGenPatchs(images.data, output_global['features'].data.cpu(), exp_config['threshold'], exp_config['L_function'])
+				output_patches = AttentionGenPatchs(images.detach(), output_global['features'].detach().cpu(), config['threshold'], config['L_function'])
 				output_local = test_model[1](output_patches['crop'].to(device))
 				images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
-
-			del output_global, output_local
-			torch.cuda.empty_cache()
 
 		images = images.to(device)
 		targets = targets.to(device)
@@ -101,7 +119,7 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 		output = model(images)
 
 		loss = criterion(output['out'], targets) / batch_multiplier
-		running_loss += loss.data.item() * batch_multiplier
+		running_loss += loss.item() * batch_multiplier
 
 		loss.backward()
 		if (i + 1) % batch_multiplier == 0:
@@ -110,18 +128,18 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		if i == random_int:
 			if branch == 'global':
-				draw_image = drawImage(images_draw['images'], images_draw['targets'], torch.sigmoid(output['out']).data)
+				draw_image = drawImage(images_draw['images'], images_draw['targets'], torch.sigmoid(output['out']).detach())
 			else:
 				draw_image = drawImage(images_draw['images'],
 										images_draw['targets'],
-										torch.sigmoid(output['out']).data,
-										output_patches['crop'].data,
-										output_patches['heatmap'].data,
+										torch.sigmoid(output['out']).detach(),
+										output_patches['crop'].detach(),
+										output_patches['heatmap'].detach(),
 										output_patches['coordinate'])
 
 			writer.add_images("train/{}".format(branch), draw_image, epoch)
 
-		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch, config['NUM_EPOCH'] - 1, loss.data.item() * batch_multiplier))
+		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch, config['NUM_EPOCH'] - 1, loss.item() * batch_multiplier))
 		progressbar.update(1)
 
 	lr_scheduler.step()
@@ -148,19 +166,19 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 	running_loss = 0.
 	len_data = len(data_loader)
 	random_int = int(torch.randint(0, len_data, (1,))[0])
-	print(" display images on index", random_int)
+	print(" Display images on index", random_int)
 
 	progressbar = tqdm(range(len_data))
 	for i, (images, targets) in enumerate(data_loader):
 
 		if i == random_int:
 			images_draw = {}
-			images_draw['images'] = images.data
-			images_draw['targets'] = targets.data
+			images_draw['images'] = images.detach()
+			images_draw['targets'] = targets.detach()
 
 		if branch == 'local':
 			output_global = test_model(images.to(device))
-			output_patches = AttentionGenPatchs(images.data, output_global['features'].data.cpu(), exp_config['threshold'], exp_config['L_function'])
+			output_patches = AttentionGenPatchs(images.detach(), output_global['features'].detach().cpu(), config['threshold'], config['L_function'])
 			images = output_patches['crop']
 
 			del output_global
@@ -168,7 +186,7 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 		
 		elif branch == 'fusion':
 			output_global = test_model[0](images.to(device))
-			output_patches = AttentionGenPatchs(images.data, output_global['features'].data.cpu(), exp_config['threshold'], exp_config['L_function'])
+			output_patches = AttentionGenPatchs(images.detach(), output_global['features'].detach().cpu(), config['threshold'], config['L_function'])
 			output_local = test_model[1](output_patches['crop'].to(device))
 			images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
 
@@ -177,20 +195,20 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 
 		images = images.to(device)
 		targets = targets.to(device)
-		gt = torch.cat((gt, targets.data.cpu()), 0)
+		gt = torch.cat((gt, targets.detach().cpu()), 0)
 
 		output = model(images)
-		pred = torch.cat((pred, torch.sigmoid(output['out']).data.cpu()), 0)
+		pred = torch.cat((pred, torch.sigmoid(output['out']).detach().cpu()), 0)
 
 		if i == random_int:
 			if branch == 'global':
-				draw_image = drawImage(images_draw['images'], images_draw['targets'], torch.sigmoid(output['out']).data)
+				draw_image = drawImage(images_draw['images'], images_draw['targets'], torch.sigmoid(output['out']).detach())
 			else:
 				draw_image = drawImage(images_draw['images'],
 										images_draw['targets'],
-										torch.sigmoid(output['out']).data,
-										output_patches['crop'].data,
-										output_patches['heatmap'].data,
+										torch.sigmoid(output['out']).detach(),
+										output_patches['crop'].detach(),
+										output_patches['heatmap'].detach(),
 										output_patches['coordinate'])
 
 			writer.add_images("val/{}".format(branch), draw_image, epoch)
@@ -256,38 +274,29 @@ def main():
 	# ================= MODELS ================= #
 	print("\n Model initialization")
 	print(" ============================================")
-	model_param = exp_config['net']
-	if 'global' in exp_config['branch']:
-		print(" Global branch")
-		GlobalModel = ResAttCheXNet(pretrained = True, num_classes = 15, **exp_config['net'])
-	if 'local' in exp_config['branch']:
-		print(" Global branch")
-		GlobalModel = ResAttCheXNet(pretrained = True, num_classes = 15, **exp_configs[model_param]['net'])
+	print(" Global branch")
+	GlobalModel = ResAttCheXNet(pretrained = True, num_classes = 15, **config['net'])
+	if 'local' in config['branch']:
 		print(" Local branch")
-		LocalModel = ResAttCheXNet(pretrained = True, num_classes = 15, **exp_configs[model_param]['net'])
-		print(" L distance function \t:", exp_config['L_function'])
-		print(" Threshold \t\t:", exp_config['threshold'])
+		LocalModel = ResAttCheXNet(pretrained = True, num_classes = 15, **config['net'])
+		print(" L distance function \t:", config['L_function'])
+		print(" Threshold \t\t:", config['threshold'])
+		FusionModel = FusionNet(backbone = config['net']['backbone'], num_classes = 15)
 
-	if 'fusion' in exp_config['branch']:
-		FusionModel = FusionNet(backbone = exp_configs[model_param]['net']['backbone'], num_classes = 15)
-		
-
-	# ================= CREATE WEIGHT ================= #
-	# count_train_labels = torch.tensor(train_dataset.labels, dtype=torch.float32).sum(axis=0)
-	# weight_train = count_train_labels.max() / count_train_labels
-
-	if exp_config['loss'] == 'BCELoss':
+	if config['loss'] == 'BCELoss':
 		criterion = nn.BCELoss()
-	elif exp_config['loss'] == 'WeightedBCELoss':
+	elif config['loss'] == 'WeightedBCELoss':
 		criterion = WeightedBCELoss(PosNegWeightIsDynamic = True)
 	else:
 		raise Exception("loss function must be BCELoss or WeightedBCELoss")
 
-	print(" Loss function \t\t:", exp_config['loss'])
+	print(" Optimizer \t\t:", list(config['optimizer'].keys())[0])
+	print(" Loss function \t\t:", config['loss'])
 	print()
 
 	for branch_name in BRANCH_NAMES:
-		start_time_train = time.time()
+		start_time_train = datetime.now()
+
 		# ================= LOAD DATASET ================= #
 		train_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'train', num_classes = 15, transform = transform_train)
 		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 4, pin_memory = True)
@@ -305,23 +314,38 @@ def main():
 			TestModel = None
 
 		if branch_name == 'local':
-			save_dict_global = torch.load(os.path.join(args.exp_dir, model_param, model_param + '_global_best' + '.pth'))
+			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best' + '.pth'))
 			GlobalModel.load_state_dict(save_dict_global['net'])
+
+			for param in GlobalModel.parameters():
+				param.requires_grad = False
 
 			Model = LocalModel.to(device)
 			TestModel = GlobalModel.to(device)
 
 		if branch_name == 'fusion':
-			save_dict_global = torch.load(os.path.join(args.exp_dir, model_param, model_param + '_global_best' + '.pth'))
+			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best' + '.pth'))
 			save_dict_local = torch.load(os.path.join(exp_dir_num, args.exp_num + '_local_best' + '.pth'))
 
 			GlobalModel.load_state_dict(save_dict_global['net'])
 			LocalModel.load_state_dict(save_dict_local['net'])
 
+			for param in GlobalModel.parameters():
+				param.requires_grad = False
+
+			for param in LocalModel.parameters():
+				param.requires_grad = False
+
 			Model = FusionModel.to(device)
 			TestModel = (GlobalModel.to(device), LocalModel.to(device))
 
-		optimizer = optim.SGD(Model.parameters(), **config['optimizer']['SGD'])
+		if 'SGD' in config['optimizer']:
+			optimizer = optim.SGD(Model.parameters(), **config['optimizer']['SGD'])
+		elif 'Adam' in config['optimizer']:
+			optimizer = optim.Adam(Model.parameters(), **config['optimizer']['Adam'])
+		else:
+			raise Exception("optimizer must be SGD or Adam")
+
 		lr_scheduler = optim.lr_scheduler.StepLR(optimizer , **config['lr_scheduler'])
 
 		if args.resume:
@@ -343,20 +367,16 @@ def main():
 			start_epoch = 0
 
 		for epoch in range(start_epoch, config['NUM_EPOCH']):
-			start_time_epoch = time.time()
+			start_time_epoch = datetime.now()
 
 			train_one_epoch(epoch, branch_name, Model, optimizer, lr_scheduler, train_loader, criterion, TestModel)
 			val_one_epoch(epoch, branch_name, Model, val_loader, TestModel)
 
-			end_time_epoch = time.time()
-			total_menit = (end_time_epoch - start_time_epoch) / 60
-			print(" Training epoch: {:.4f} jam ({:.2f} menit)".format(total_menit / 60, total_menit))
+			print(" Training epoch time: {}".format(datetime.now() - start_time_epoch))
 
 		print(" Training " + branch_name + " branch done")
 
-		end_time_train = time.time()
-		total_menit = (end_time_train - start_time_train) / 60
-		print(" Training time {} branch: {:.4f} jam ({:.2f} menit)".format(branch_name, total_menit / 60, total_menit))
+		print(" Training time {} branch: {}".format(branch_name, datetime.now() - start_time_train))
 
 if __name__ == "__main__":
 	main()

@@ -3,7 +3,6 @@ from torch.utils.data import Dataset
 from PIL import Image
 import os
 
-
 class ChestXrayDataSet(Dataset):
     def __init__(self, data_dir, split, num_classes=14, transform=None):
         """
