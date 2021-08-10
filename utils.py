@@ -45,7 +45,7 @@ def L3(feature):
 	return output
 
 @torch.no_grad()
-def AttentionGenPatchs(ori_image, features_global, threshold = 0.7):
+def AttentionGenPatchs(ori_image, features_global, threshold = 0.7, l_function = "Lmax"):
 
 	batch_size = features_global.shape[0]
 	n, c, h, w = ori_image.shape
@@ -55,8 +55,16 @@ def AttentionGenPatchs(ori_image, features_global, threshold = 0.7):
 	coordinates = []
 
 	for b in range(batch_size):
-		heatmap = Lmax(features_global[b])
+		if l_function == "Lmax":
+			heatmap = Lmax(features_global[b])
+		elif l_function == "L1":
+			heatmap = L1(features_global[b])
+		elif l_function == "L2":
+			heatmap = L2(features_global[b])
+		else:
+			raise Exception("L function must be Lmax, L1 or L2")
 
+		heatmap = Lnormalize(heatmap)
 		heatmap = F.interpolate(heatmap.unsqueeze(0).unsqueeze(0), size=(h, w), mode = 'bilinear', align_corners = True).squeeze()
 		heatmaps[b] = heatmap
 		heatmap[heatmap > threshold] = 1
@@ -77,7 +85,7 @@ def AttentionGenPatchs(ori_image, features_global, threshold = 0.7):
 		img_crop = ori_image[b][:, xmin:xmax, ymin:ymax]
 		cropped_image[b] = F.interpolate(img_crop.unsqueeze(0), size=(h, w), mode = 'bilinear', align_corners = True).squeeze(0)
 
-		coordinates.append([xmin, ymin, xmax, ymax])
+		coordinates.append([ymin, xmin, ymax, xmax])
 
 	output = {
 		'crop' : cropped_image,
@@ -110,7 +118,7 @@ def save_model(exp_dir, epoch, loss, model, optimizer, lr_scheduler, branch_name
 		"optim": optimizer.state_dict(),
 		"lr_scheduler": lr_scheduler.state_dict()
 	}
-	save_name = os.path.join(exp_dir, exp_dir.split('/')[-1] + '_' + branch_name + '.pth')
+	save_name = os.path.join(exp_dir, os.path.split(exp_dir)[-1] + '_' + branch_name + '.pth')
 	torch.save(save_dict, save_name)
 	print(" Model is saved: {}".format(save_name))
 

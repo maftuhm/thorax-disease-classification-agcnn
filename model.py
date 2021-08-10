@@ -27,6 +27,12 @@ class ResAttCheXNet(nn.Module):
         else:
             raise Exception("backbone must be resnet50 or densenet121")
 
+        print(" Backbone \t\t:", backbone)
+        print(" Last pooling layer\t:", last_pool)
+        print(" Pretrained model \t:", pretrained)
+        if last_pool == 'lse':
+            print(" lse pooling controller :", lse_pool_controller)
+
     def forward(self, image):
         out, features, pool = self.backbone(image)
 

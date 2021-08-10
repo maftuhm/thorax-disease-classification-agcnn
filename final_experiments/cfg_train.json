@@ -1,0 +1,93 @@
+{
+	"exp0" : {
+		"net" : {
+			"backbone" : "resnet50",
+			"last_pool" : "max"
+		},
+		"branch" : ["global"],
+		"loss" : "BCELoss"
+	},
+	"exp1" : {
+		"net" : {
+			"backbone" : "resnet50",
+			"last_pool" : "max"
+		},
+		"branch" : ["global"],
+		"loss" : "WeightedBCELoss"
+	},
+	"exp2" : {
+		"net" : {
+			"backbone" : "resnet50",
+			"last_pool" : "lse",
+			"lse_pool_controller" : 10
+		},
+		"branch" : ["global"],
+		"loss" : "?"
+	},
+	"exp3" : {
+		"net" : {
+			"backbone" : "resnet50",
+			"last_pool" : "avg"
+		},
+		"branch" : ["global"],
+		"loss" : "?"
+	},
+	"exp4" : {
+		"net" : {
+			"backbone" : "densenet121",
+			"last_pool" : "?"
+		},
+		"branch" : ["global"],
+		"loss" : "?"
+	},
+	"exp5" : {
+		"net" : {
+			"backbone" : "resnet50",
+			"last_pool" : "lse",
+			"lse_pool_controller" : 8
+		},
+		"branch" : ["global"],
+		"loss" : "?"
+	},
+	"exp6" : {
+		"net" : {
+			"backbone" : "resnet50",
+			"last_pool" : "lse",
+			"lse_pool_controller" : 12
+		},
+		"branch" : ["global"],
+		"loss" : "?"
+	},
+	"exp7" : {
+		"net" : "?",
+		"branch" : ["local", "fusion"],
+		"loss" : "?",
+		"L_function" : "?",
+		"threshold" : 0.7
+	},
+	"exp8" : {
+		"net" : "?",
+		"branch" : ["local", "fusion"],
+		"loss" : "?",
+		"L_function" : "?",
+		"threshold" : 0.6
+	},
+	"exp9" : {
+		"net" : "?",
+		"branch" : ["local", "fusion"],
+		"L_function" : "?",
+		"threshold" : 0.8
+	},
+	"exp10" : {
+		"net" : "?",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L1",
+		"threshold" : -1
+	},
+	"exp11" : {
+		"net" : "?",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L2",
+		"threshold" : -1
+	}
+}
