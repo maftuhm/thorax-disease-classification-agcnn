@@ -119,7 +119,7 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 		output = model(images)
 
 		loss = criterion(output['out'], targets) / batch_multiplier
-		running_loss += loss.item() * batch_multiplier
+		running_loss += loss.detach().item() * batch_multiplier
 
 		loss.backward()
 		if (i + 1) % batch_multiplier == 0:
@@ -159,6 +159,13 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 	print(" Validating {} model".format(branch, epoch))
 
 	model.eval()
+
+	if test_model != None:
+		if type(test_model) == tuple:
+			test_model[0].eval()
+			test_model[1].eval()
+		else:
+			test_model.eval()
 	
 	gt = torch.FloatTensor()
 	pred = torch.FloatTensor()
@@ -302,7 +309,7 @@ def main():
 		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 10, pin_memory = True)
 
 		val_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'test', num_classes = 15, transform = transform_test)
-		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name], shuffle = False, num_workers = 10, pin_memory = True)
+		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 4, shuffle = False, num_workers = 10, pin_memory = True)
 
 		# test_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'test', num_classes = config['net']['num_classes'], transform = transform_test)
 		# test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size']['global'] // 2, shuffle = False, num_workers = 4, pin_memory = True)

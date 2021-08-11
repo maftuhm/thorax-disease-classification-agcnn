@@ -244,25 +244,38 @@ class LSEPool2d(nn.Module):
         return xpool
 
 
-def ResNet50(pretrained = True, num_classes = 14, last_pool = 'lse', lse_pool_controller = 10, **kwargs):
+def ResNet50(pretrained = True, num_classes = 14, last_pool = 'lse', lse_pool_controller = 10, group_norm = True, **kwargs):
+
+    if group_norm:
+        norm_layer = lambda x: nn.GroupNorm(32, x)
+    else:
+        norm_layer = None
 
     model = ResNet(block = Bottleneck, layers = [3, 4, 6, 3], num_classes = num_classes,
-                    last_pool = last_pool, lse_pool_controller = lse_pool_controller, **kwargs)
+                    last_pool = last_pool, lse_pool_controller = lse_pool_controller, norm_layer = norm_layer, **kwargs)
 
     if pretrained:
         print(" Loading state dict from", model_urls['resnet50'])
         # Pretrained ResNet base
-        state_dict = load_state_dict_from_url(model_urls['resnet50'], progress = True)
+        loaded_state_dict = load_state_dict_from_url(model_urls['resnet50'], progress = True)
+        del loaded_state_dict['fc.weight'], loaded_state_dict['fc.bias']
+
+        model_state_dict = model.state_dict()
+
+        for key in model_state_dict:
+            if key in loaded_state_dict:
+                model_state_dict[key] = loaded_state_dict[key]
 
         # Subsample fc with size [1000, 2048] to [num_classes, 2048] by unfold
         # step_fold = (1000 // model.state_dict()['fc.weight'].size(0)) + 1
         # state_dict['fc.weight'] = state_dict['fc.weight'].unfold(0, 1, step_fold).flatten(1)  # (num_classes, 2048)
         # state_dict['fc.bias'] = state_dict['fc.bias'].unfold(0, 1, step_fold).flatten()  # (num_classes)
 
-        state_dict['fc.weight'] = model.state_dict()['fc.weight'].data
-        state_dict['fc.bias'] = model.state_dict()['fc.bias'].data
+        # state_dict['fc.weight'] = model.state_dict()['fc.weight'].data
+        # state_dict['fc.bias'] = model.state_dict()['fc.bias'].data
 
-        model.load_state_dict(state_dict)
+        model.load_state_dict(model_state_dict)
+        del loaded_state_dict, model_state_dict
         print(" State dict is loaded")
 
     return model
