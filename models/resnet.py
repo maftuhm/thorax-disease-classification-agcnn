@@ -250,6 +250,7 @@ def ResNet50(pretrained = True, num_classes = 14, last_pool = 'lse', lse_pool_co
                     last_pool = last_pool, lse_pool_controller = lse_pool_controller, **kwargs)
 
     if pretrained:
+        print(" Loading state dict from", model_urls['resnet50'])
         # Pretrained ResNet base
         state_dict = load_state_dict_from_url(model_urls['resnet50'], progress = True)
 
@@ -262,5 +263,6 @@ def ResNet50(pretrained = True, num_classes = 14, last_pool = 'lse', lse_pool_co
         state_dict['fc.bias'] = model.state_dict()['fc.bias'].data
 
         model.load_state_dict(state_dict)
+        print(" State dict is loaded")
 
     return model

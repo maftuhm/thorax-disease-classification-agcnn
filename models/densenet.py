@@ -227,6 +227,7 @@ def DenseNet121(pretrained = True, num_classes = 14, last_pool = 'lse', lse_pool
                     num_init_features = 64, num_classes = num_classes,
                     last_pool = last_pool, lse_pool_controller = lse_pool_controller, **kwargs)
     if pretrained:
+        print(" Loading state dict from", model_urls['densenet121'])
         # '.'s are no longer allowed in module names, but previous _DenseLayer
         # has keys 'norm.1', 'relu.1', 'conv.1', 'norm.2', 'relu.2', 'conv.2'.
         # They are also in the checkpoints in model_urls. This pattern is used
@@ -250,5 +251,6 @@ def DenseNet121(pretrained = True, num_classes = 14, last_pool = 'lse', lse_pool
         state_dict['classifier.bias'] = model.state_dict()['classifier.bias'].data
 
         model.load_state_dict(state_dict)
+        print(" State dict is loaded")
 
     return model
