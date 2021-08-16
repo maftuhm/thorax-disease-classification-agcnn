@@ -2,7 +2,8 @@
 	"exp0" : {
 		"net" : {
 			"backbone" : "resnet50",
-			"last_pool" : "max"
+			"last_pool" : "max",
+			"group_norm" : true
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",
@@ -14,7 +15,7 @@
 			"last_pool" : "max"
 		},
 		"branch" : ["global"],
-		"optimizer" : "Adam",
+		"optimizer" : "SGD",
 		"loss" : "BCELoss"
 	},
 	"exp2" : {
@@ -23,8 +24,9 @@
 			"last_pool" : "max"
 		},
 		"branch" : ["global"],
-		"optimizer" : "?",
-		"loss" : "WeightedBCELoss"
+		"optimizer" : "SGD",
+		"loss" : "BCELoss",
+		"num_classes" : 14
 	},
 	"exp3" : {
 		"net" : {

@@ -231,20 +231,19 @@ class ResNet(nn.Module):
         return self._forward_impl(x)
 
 class LSEPool2d(nn.Module):
-    def __init__(self, controller = 10):
+    def __init__(self, controller = 10, kernel_size = 7, stride = 1):
         super(LSEPool2d, self).__init__()
         self.controller = controller
-        self.maxpool = nn.MaxPool2d(kernel_size = 7, stride = 1)
+        self.maxpool = nn.MaxPool2d(kernel_size = kernel_size, stride = stride)
 
     def forward(self, x):
-        xmaxpool = torch.abs(x)
-        xmaxpool = self.maxpool(xmaxpool)
-        xpool = (1 / (x.shape[-1] * x.shape[-2])) * torch.sum(torch.exp(self.controller * (x - xmaxpool)), dim = (-2, -1))
-        xpool  = xmaxpool + (1 / self.controller) * torch.log(xpool).unsqueeze(-1).unsqueeze(-1)
-        return xpool
+        xmax = self.maxpool(x)
+        out = torch.sum(torch.exp(self.controller * (x - xmax)), dim = (-2, -1), keepdim=True) / torch.prod(torch.tensor(x[0].shape))
+        out  = xmax + torch.log(out) / self.controller
+        return out
 
 
-def ResNet50(pretrained = True, num_classes = 14, last_pool = 'lse', lse_pool_controller = 10, group_norm = True, **kwargs):
+def ResNet50(pretrained = True, num_classes = 14, last_pool = 'lse', lse_pool_controller = 10, group_norm = False, **kwargs):
 
     if group_norm:
         norm_layer = lambda x: nn.GroupNorm(32, x)
@@ -262,8 +261,8 @@ def ResNet50(pretrained = True, num_classes = 14, last_pool = 'lse', lse_pool_co
 
         model_state_dict = model.state_dict()
 
-        for key in model_state_dict:
-            if key in loaded_state_dict:
+        for key in list(model_state_dict.keys()):
+            if key in list(loaded_state_dict.keys()):
                 model_state_dict[key] = loaded_state_dict[key]
 
         # Subsample fc with size [1000, 2048] to [num_classes, 2048] by unfold

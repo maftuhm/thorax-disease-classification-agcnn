@@ -6,7 +6,7 @@ from models import ResNet50, DenseNet121
 class ResAttCheXNet(nn.Module):
     def __init__(self, last_pool = 'lse', lse_pool_controller = 5, 
                 backbone = 'resnet50', pretrained = True, 
-                num_classes = 14, **kwargs):
+                num_classes = 14, group_norm = False, **kwargs):
         super(ResAttCheXNet, self).__init__()
 
         # ----------------- Backbone -----------------
@@ -15,6 +15,7 @@ class ResAttCheXNet(nn.Module):
                                     num_classes = num_classes,
                                     last_pool = last_pool,
                                     lse_pool_controller = lse_pool_controller,
+                                    group_norm = group_norm,
                                     **kwargs)
 
         elif backbone == 'densenet121':
@@ -32,6 +33,7 @@ class ResAttCheXNet(nn.Module):
         print(" Pretrained model \t:", pretrained)
         if last_pool == 'lse':
             print(" lse pooling controller :", lse_pool_controller)
+        print(" Group normalization \t:", group_norm)
 
     def forward(self, image):
         out, features, pool = self.backbone(image)

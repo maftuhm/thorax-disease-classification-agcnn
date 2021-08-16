@@ -138,7 +138,7 @@ def compute_AUCs(gt, pred):
 	AUROCs = []
 	gt_np = gt.cpu().numpy()
 	pred_np = pred.cpu().numpy()
-	for i in range(len(CLASS_NAMES)):
+	for i in range(len(gt_np[0])):
 		AUROCs.append(roc_auc_score(gt_np[:, i], pred_np[:, i]))
 	return AUROCs
 
