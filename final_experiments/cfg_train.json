@@ -30,80 +30,111 @@
 	},
 	"exp3" : {
 		"net" : {
-			"backbone" : "resnet50",
-			"last_pool" : "lse",
-			"lse_pool_controller" : 10
+			"backbone" : "densenet121",
+			"last_pool" : "max"
 		},
 		"branch" : ["global"],
-		"optimizer" : "?",
-		"loss" : "?"
+		"optimizer" : "SGD",
+		"loss" : "BCELoss",
+		"num_classes" : 14
 	},
 	"exp4" : {
 		"net" : {
-			"backbone" : "resnet50",
-			"last_pool" : "avg"
+			"backbone" : "densenet121",
+			"last_pool" : "max"
 		},
 		"branch" : ["global"],
-		"optimizer" : "?",
-		"loss" : "?"
+		"optimizer" : "Adam",
+		"loss" : "BCELoss",
+		"num_classes" : 14
 	},
 	"exp5" : {
 		"net" : {
 			"backbone" : "densenet121",
-			"last_pool" : "?"
+			"last_pool" : "max"
 		},
 		"branch" : ["global"],
-		"optimizer" : "?",
-		"loss" : "?"
+		"optimizer" : "Adam",
+		"loss" : "WeightedBCELoss",
+		"num_classes" : 14
 	},
 	"exp6" : {
 		"net" : {
-			"backbone" : "resnet50",
+			"backbone" : "densenet121",
+			"last_pool" : "lse",
+			"lse_pool_controller" : 10
+		},
+		"branch" : ["global"],
+		"optimizer" : "Adam",
+		"loss" : "WeightedBCELoss",
+		"num_classes" : 14
+	},
+	"_comment_open_": "optional setelah training semua sampe fusion",
+	"exp7" : {
+		"net" : {
+			"backbone" : "densenet121",
+			"last_pool" : "avg"
+		},
+		"branch" : ["global"],
+		"optimizer" : "Adam",
+		"loss" : "WeightedBCELoss",
+		"num_classes" : 14
+	},
+	"exp8" : {
+		"net" : {
+			"backbone" : "densenet121",
 			"last_pool" : "lse",
 			"lse_pool_controller" : 8
 		},
 		"branch" : ["global"],
-		"optimizer" : "?",
-		"loss" : "?"
+		"optimizer" : "Adam",
+		"loss" : "WeightedBCELoss",
+		"num_classes" : 14
 	},
-	"exp7" : {
+	"exp9" : {
 		"net" : {
-			"backbone" : "resnet50",
+			"backbone" : "densenet121",
 			"last_pool" : "lse",
 			"lse_pool_controller" : 12
 		},
 		"branch" : ["global"],
-		"optimizer" : "?",
-		"loss" : "?"
+		"optimizer" : "Adam",
+		"loss" : "WeightedBCELoss",
+		"num_classes" : 14
 	},
-	"exp8" : {
-		"net" : "?",
+	"_comment_close_": "optional setelah training semua sampe fusion",
+
+	"exp10" : {
+		"net" : "exp6",
 		"branch" : ["local", "fusion"],
 		"L_function" : "Lmax",
 		"threshold" : 0.7
 	},
-	"exp9" : {
-		"net" : "?",
+
+	"_comment_open1_": "optional setelah training semua sampe fusion dan kalo sempet threshold 0.1-0.9",
+	"exp11" : {
+		"net" : "exp6",
 		"branch" : ["local", "fusion"],
-		"L_function" : "?",
+		"L_function" : "Lmax",
 		"threshold" : 0.6
 	},
-	"exp10" : {
-		"net" : "?",
+	"exp12" : {
+		"net" : "exp6",
 		"branch" : ["local", "fusion"],
-		"L_function" : "?",
+		"L_function" : "Lmax",
 		"threshold" : 0.8
 	},
-	"exp11" : {
-		"net" : "?",
+	"_comment_close2_": "optional setelah training semua sampe fusion dan kalo sempet threshold 0.1-0.9",
+	"exp13" : {
+		"net" : "exp6",
 		"branch" : ["local", "fusion"],
 		"L_function" : "L1",
-		"threshold" : -1
+		"threshold" : 0.7
 	},
-	"exp12" : {
-		"net" : "?",
+	"exp14" : {
+		"net" : "exp6",
 		"branch" : ["local", "fusion"],
 		"L_function" : "L2",
-		"threshold" : -1
+		"threshold" : 0.7
 	}
 }
