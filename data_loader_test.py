@@ -35,17 +35,21 @@ def loop(loader):
     del loader
 
 def main():
-    pin_memory = True
-    print(' pin_memory is', pin_memory)
-    train_data = ChestXrayDataSet(data_dir = DATA_DIR, split = 'train', num_classes = 14, transform = transform_train)
-    val_data = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = 14, transform = transform_test)
-    for num_workers in range(2, 10): 
-        train_loader = DataLoader(train_data, batch_size=16, shuffle = True, num_workers=num_workers, pin_memory=pin_memory)
-        val_loader = DataLoader(val_data, batch_size = 64, shuffle = False, num_workers=num_workers, pin_memory = pin_memory)
+    train_data = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = 14, transform = transform_train)
+    val_data = ChestXrayDataSet(data_dir = DATA_DIR, split = 'val', num_classes = 14, transform = transform_test)
+    for num_workers in range(3, 10): 
+        train_loader = DataLoader(train_data, batch_size=16, shuffle = True, num_workers = num_workers, pin_memory = True)
+        val_loader = DataLoader(val_data, batch_size = 64, shuffle = False, num_workers = num_workers, pin_memory = True)
+        
         start = time.time()
         loop(train_loader)
+        end = time.time()
+        print(" Finish train_loader with: {} seconds, num_workers={}\n".format(end - start, num_workers))
+        
+        start = time.time()
         loop(val_loader)
         end = time.time()
-        print(" Finish with: {} seconds, num_workers={}\n".format(end - start, num_workers))
+        print(" Finish val_loader with: {} seconds, num_workers={}\n".format(end - start, num_workers))
+
 if __name__ == "__main__":
     main()

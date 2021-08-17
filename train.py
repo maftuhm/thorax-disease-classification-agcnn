@@ -64,7 +64,7 @@ if 'num_classes' in list(config.keys()):
 NUM_CLASSES = len(CLASS_NAMES)
 BRANCH_NAMES = config['branch']
 BEST_AUROCs = {branch: -1000 for branch in BRANCH_NAMES}
-# BEST_AUROCs['global'] = 0.82879
+BEST_AUROCs['global'] = 0.82879
 
 MAX_BATCH_CAPACITY = {
 	'global' : 16,
