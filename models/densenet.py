@@ -7,6 +7,7 @@ from collections import OrderedDict
 from torchvision.models.utils import load_state_dict_from_url
 from torch import Tensor
 from torch.jit.annotations import List
+from utils import LSEPool2d
 
 
 __all__ = ['DenseNet', 'densenet121', 'densenet169', 'densenet201', 'densenet161']
@@ -208,18 +209,6 @@ class DenseNet(nn.Module):
         out = self.classifier(flatten_pool)
         out = F.sigmoid(out)
         return out, features, flatten_pool
-
-class LSEPool2d(nn.Module):
-    def __init__(self, controller = 10, kernel_size = 7, stride = 1):
-        super(LSEPool2d, self).__init__()
-        self.controller = controller
-        self.maxpool = nn.MaxPool2d(kernel_size = kernel_size, stride = stride)
-
-    def forward(self, x):
-        xmax = self.maxpool(x)
-        out = torch.sum(torch.exp(self.controller * (x - xmax)), dim = (-2, -1), keepdim=True) / torch.prod(torch.tensor(x[0].shape))
-        out  = xmax + torch.log(out) / self.controller
-        return out
 
 def DenseNet121(pretrained = True, num_classes = 14, last_pool = 'lse', lse_pool_controller = 10, **kwargs):
     model = DenseNet(growth_rate = 32, block_config = (6, 12, 24, 16),

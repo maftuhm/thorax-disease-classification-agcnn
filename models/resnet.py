@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torchvision.models.utils import load_state_dict_from_url
-
+from utils import LSEPool2d
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152', 'resnext50_32x4d', 'resnext101_32x8d',
@@ -229,18 +229,6 @@ class ResNet(nn.Module):
 
     def forward(self, x):
         return self._forward_impl(x)
-
-class LSEPool2d(nn.Module):
-    def __init__(self, controller = 10, kernel_size = 7, stride = 1):
-        super(LSEPool2d, self).__init__()
-        self.controller = controller
-        self.maxpool = nn.MaxPool2d(kernel_size = kernel_size, stride = stride)
-
-    def forward(self, x):
-        xmax = self.maxpool(x)
-        out = torch.sum(torch.exp(self.controller * (x - xmax)), dim = (-2, -1), keepdim=True) / torch.prod(torch.tensor(x[0].shape))
-        out  = xmax + torch.log(out) / self.controller
-        return out
 
 
 def ResNet50(pretrained = True, num_classes = 14, last_pool = 'lse', lse_pool_controller = 10, group_norm = False, **kwargs):

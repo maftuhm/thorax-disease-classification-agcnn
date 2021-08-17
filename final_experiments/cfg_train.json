@@ -77,7 +77,7 @@
 		"loss" : "?"
 	},
 	"exp8" : {
-		"net" : "exp0",
+		"net" : "?",
 		"branch" : ["local", "fusion"],
 		"L_function" : "Lmax",
 		"threshold" : 0.7

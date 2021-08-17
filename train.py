@@ -14,9 +14,11 @@ import torch.backends.cudnn as cudnn
 
 import torchvision.transforms as transforms
 
-from read_data import ChestXrayDataSet
-from model import ResAttCheXNet, FusionNet, WeightedBCELoss
-from utils import *
+from model import ResAttCheXNet, FusionNet
+from utils import WeightedBCELoss, AttentionMaskInference, ChestXrayDataSet
+
+from utils.utils import *
+from config import *
 
 def parse_args():
 	parser = argparse.ArgumentParser(description='AG-CNN')
@@ -47,7 +49,6 @@ if 'local' in exp_config['branch']:
 	else:
 		raise Exception("experiment number global branch must be choosen")
 
-
 config['optimizer'] = {exp_config['optimizer'] : config['optimizer'][exp_config['optimizer']]}
 del exp_config['optimizer']
 
@@ -56,10 +57,6 @@ del exp_config, exp_configs
 
 exp_dir_num = path.join(args.exp_dir, args.exp_num)
 os.makedirs(exp_dir_num, exist_ok=True)
-
-# ================= CONSTANTS ================= #
-# data_dir = path.join('D:/', 'Data', 'data')
-data_dir = path.join('..', 'lung-disease-detection', 'data')
 
 if 'num_classes' in list(config.keys()):
 	CLASS_NAMES = CLASS_NAMES[:config['num_classes']]
@@ -70,7 +67,7 @@ BEST_AUROCs = {branch: -1000 for branch in BRANCH_NAMES}
 # BEST_AUROCs['global'] = 0.82216
 
 MAX_BATCH_CAPACITY = {
-	'global' : 12,
+	'global' : 16,
 	'local' : 8,
 	'fusion' : 8
 }
@@ -85,11 +82,7 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 	optimizer.zero_grad()
 
 	if test_model is not None:
-		if type(test_model) == tuple:
-			test_model[0].eval()
-			test_model[1].eval()
-		else:
-			test_model.eval()
+		for i in range(len(test_model)): test_model[i].eval()
 
 	running_loss = 0.
 	len_data = len(data_loader)
@@ -109,15 +102,15 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		if branch == 'local':
 			with torch.no_grad():
-				output_global = test_model(images.to(device))
-				output_patches = AttentionGenPatchs(images.detach(), output_global['features'].detach().cpu(), config['threshold'], config['L_function'])
+				output_global = test_model[0](images.to(device))
+				output_patches = test_model[1](images.detach(), output_global['features'].detach().cpu())
 				images = output_patches['crop']
-		
+
 		elif branch == 'fusion':
 			with torch.no_grad():
 				output_global = test_model[0](images.to(device))
-				output_patches = AttentionGenPatchs(images.detach(), output_global['features'].detach().cpu(), config['threshold'], config['L_function'])
-				output_local = test_model[1](output_patches['crop'].to(device))
+				output_patches = test_model[1](images.detach(), output_global['features'].detach().cpu())
+				output_local = test_model[2](output_patches['crop'].to(device))
 				images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
 
 		images = images.to(device)
@@ -150,7 +143,6 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 		progressbar.set_description(" Epoch: [{}/{}] | last backward: {} it | loss: {:.5f}".format(epoch, config['NUM_EPOCH'] - 1, weight_last_updated, loss.item() * batch_multiplier))
 		progressbar.update(1)
 
-	# lr_scheduler.step()
 	progressbar.close()
 
 	epoch_loss = running_loss / float(len_data)
@@ -162,18 +154,14 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 	save_model(exp_dir_num, epoch, epoch_loss, model, optimizer, lr_scheduler, branch)
 
 @torch.no_grad()
-def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
+def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = None, val = True):
 
 	print("\n Validating {} model".format(branch))
 
 	model.eval()
 
 	if test_model is not None:
-		if type(test_model) == tuple:
-			test_model[0].eval()
-			test_model[1].eval()
-		else:
-			test_model.eval()
+		for i in range(len(test_model)): test_model[i].eval()
 	
 	gt = torch.FloatTensor()
 	pred = torch.FloatTensor()
@@ -192,8 +180,8 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 			images_draw['targets'] = targets.detach()
 
 		if branch == 'local':
-			output_global = test_model(images.to(device))
-			output_patches = AttentionGenPatchs(images.detach(), output_global['features'].detach().cpu(), config['threshold'], config['L_function'])
+			output_global = test_model[0](images.to(device))
+			output_patches = test_model[1](images.detach(), output_global['features'].detach().cpu())
 			images = output_patches['crop']
 
 			del output_global
@@ -201,8 +189,8 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 		
 		elif branch == 'fusion':
 			output_global = test_model[0](images.to(device))
-			output_patches = AttentionGenPatchs(images.detach(), output_global['features'].detach().cpu(), config['threshold'], config['L_function'])
-			output_local = test_model[1](output_patches['crop'].to(device))
+			output_patches = test_model[1](images.detach(), output_global['features'].detach().cpu())
+			output_local = test_model[2](output_patches['crop'].to(device))
 			images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
 
 			del output_global, output_local
@@ -213,6 +201,9 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 		gt = torch.cat((gt, targets.detach().cpu()), 0)
 
 		output = model(images)
+		loss = criterion(output['out'], targets)
+		running_loss += loss.item()
+
 		pred = torch.cat((pred, torch.sigmoid(output['out']).detach().cpu()), 0)
 
 		if i == random_int:
@@ -228,17 +219,21 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 
 			writer.add_images("val/{}".format(branch), draw_image, epoch)
 
-		progressbar.set_description(" Epoch: [{}/{}]".format(epoch,  config['NUM_EPOCH'] - 1))
+		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch,  config['NUM_EPOCH'] - 1, loss.item()))
 		progressbar.update(1)
 
 	progressbar.close()
+
+	epoch_loss = running_loss / float(len_data)
+	print(' Epoch over Loss: {:.5f}'.format(epoch_loss))
+	writer.add_scalars("val/loss", {branch: epoch_loss}, epoch)
 
 	AUROCs = compute_AUCs(gt, pred)
 	AUROCs_mean = np.array(AUROCs).mean()
 
 	writer.add_scalars("val/AUROCs", {branch: AUROCs_mean}, epoch)
 
-	if AUROCs_mean > BEST_AUROCs[branch]:
+	if AUROCs_mean > BEST_AUROCs[branch] and val:
 		BEST_AUROCs[branch] = AUROCs_mean
 		save_name = path.join(exp_dir_num, args.exp_num + '_' + branch + '.pth')
 		copy_name = os.path.join(exp_dir_num, args.exp_num + '_' + branch + '_best.pth')
@@ -265,102 +260,6 @@ def val_one_epoch(epoch, branch, model, data_loader, test_model = None):
 	print()
 
 	return AUROCs_mean
-
-
-# @torch.no_grad()
-# def test(branch, model, data_loader, test_model = None):
-
-# 	print("\n Testing {} model".format(branch))
-
-# 	model.eval()
-
-# 	if test_model is not None:
-# 		if type(test_model) == tuple:
-# 			test_model[0].eval()
-# 			test_model[1].eval()
-# 		else:
-# 			test_model.eval()
-	
-# 	gt = torch.FloatTensor()
-# 	pred = torch.FloatTensor()
-
-# 	running_loss = 0.
-# 	len_data = len(data_loader)
-# 	random_int = int(torch.randint(0, len_data, (1,))[0])
-# 	print(" Display images on index", random_int)
-
-# 	progressbar = tqdm(range(len_data))
-# 	for i, (images, targets) in enumerate(data_loader):
-
-# 		if i == random_int:
-# 			images_draw = {}
-# 			images_draw['images'] = images.detach()
-# 			images_draw['targets'] = targets.detach()
-
-# 		if branch == 'local':
-# 			output_global = test_model(images.to(device))
-# 			output_patches = AttentionGenPatchs(images.detach(), output_global['features'].detach().cpu(), config['threshold'], config['L_function'])
-# 			images = output_patches['crop']
-
-# 			del output_global
-# 			torch.cuda.empty_cache()
-		
-# 		elif branch == 'fusion':
-# 			output_global = test_model[0](images.to(device))
-# 			output_patches = AttentionGenPatchs(images.detach(), output_global['features'].detach().cpu(), config['threshold'], config['L_function'])
-# 			output_local = test_model[1](output_patches['crop'].to(device))
-# 			images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
-
-# 			del output_global, output_local
-# 			torch.cuda.empty_cache()
-
-# 		images = images.to(device)
-# 		targets = targets.to(device)
-# 		gt = torch.cat((gt, targets.detach().cpu()), 0)
-
-# 		output = model(images)
-# 		pred = torch.cat((pred, torch.sigmoid(output['out']).detach().cpu()), 0)
-
-# 		if i == random_int:
-# 			if branch == 'global':
-# 				draw_image = drawImage(images_draw['images'], images_draw['targets'], torch.sigmoid(output['out']).detach())
-# 			else:
-# 				draw_image = drawImage(images_draw['images'],
-# 										images_draw['targets'],
-# 										torch.sigmoid(output['out']).detach(),
-# 										output_patches['crop'].detach(),
-# 										output_patches['heatmap'].detach(),
-# 										output_patches['coordinate'])
-
-# 			writer.add_images("test/{}".format(branch), draw_image, epoch)
-
-# 		progressbar.set_description(" Testing model")
-# 		progressbar.update(1)
-
-# 	progressbar.close()
-
-# 	AUROCs = compute_AUCs(gt, pred)
-# 	AUROCs_mean = np.array(AUROCs).mean()
-
-# 	writer.add_scalars("test/AUROCs", {branch: AUROCs_mean}, epoch)
-
-# 	print("|=======================================|")
-# 	print("|\t\t  AUROC\t\t\t|")
-# 	print("|=======================================|")
-# 	print("|\t      " + branch + " branch\t\t|")
-# 	print("|---------------------------------------|")
-# 	for i in range(len(CLASS_NAMES)):
-# 		if len(CLASS_NAMES[i]) < 6:
-# 			print("| {}\t\t\t|".format(CLASS_NAMES[i]), end="")
-# 		elif len(CLASS_NAMES[i]) > 14:
-# 			print("| {}\t|".format(CLASS_NAMES[i]), end="")
-# 		else:
-# 			print("| {}\t\t|".format(CLASS_NAMES[i]), end="")
-# 		print("  {:.10f}\t|".format(AUROCs[i]))
-# 	print("|---------------------------------------|")
-# 	print("| Average\t\t|  {:.10f}\t|".format(AUROCs_mean))
-# 	print("|=======================================|")
-# 	print()
 
 def main():
 	# ================= TRANSFORMS ================= #
@@ -397,6 +296,7 @@ def main():
 	if 'local' in config['branch']:
 		print(" Local branch")
 		LocalModel = ResAttCheXNet(pretrained = pretrained, num_classes = NUM_CLASSES, **config['net'])
+		AttentionGenPatchs = AttentionMaskInference(threshold = config['threshold'], distance_function = config['L_function'])
 		print(" L distance function \t:", config['L_function'])
 		print(" Threshold \t\t:", config['threshold'])
 		FusionModel = FusionNet(backbone = config['net']['backbone'], num_classes = NUM_CLASSES)
@@ -417,14 +317,14 @@ def main():
 		start_time_train = datetime.now()
 
 		# ================= LOAD DATASET ================= #
-		train_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'train', num_classes = NUM_CLASSES, transform = transform_train)
-		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 8, pin_memory = True)
+		train_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'train', num_classes = NUM_CLASSES, transform = transform_train)
+		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 4, pin_memory = True)
 
-		val_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'val', num_classes = NUM_CLASSES, transform = transform_test)
-		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 4, shuffle = False, num_workers = 8, pin_memory = True)
+		val_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'val', num_classes = NUM_CLASSES, transform = transform_test)
+		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, num_workers = 4, pin_memory = True)
 
-		# test_dataset = ChestXrayDataSet(data_dir = data_dir, split = 'test', num_classes = NUM_CLASSES, transform = transform_test)
-		# test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 4, shuffle = False, num_workers = 8, pin_memory = True)
+		test_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = NUM_CLASSES, transform = transform_test)
+		test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, num_workers = 4, pin_memory = True)
 
 		print(" Start training " + branch_name + " branch...")
 	
@@ -440,7 +340,7 @@ def main():
 				param.requires_grad = False
 
 			Model = LocalModel.to(device)
-			TestModel = GlobalModel.to(device)
+			TestModel = (GlobalModel.to(device), AttentionGenPatchs)
 
 		if branch_name == 'fusion':
 			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best' + '.pth'))
@@ -456,7 +356,7 @@ def main():
 				param.requires_grad = False
 
 			Model = FusionModel.to(device)
-			TestModel = (GlobalModel.to(device), LocalModel.to(device))
+			TestModel = (GlobalModel.to(device), AttentionGenPatchs, LocalModel.to(device))
 
 		if 'SGD' in config['optimizer']:
 			optimizer = optim.SGD(Model.parameters(), **config['optimizer']['SGD'])
@@ -490,12 +390,12 @@ def main():
 			start_time_epoch = datetime.now()
 
 			train_one_epoch(epoch, branch_name, Model, optimizer, lr_scheduler, train_loader, criterion, TestModel)
-			val_auroc = val_one_epoch(epoch, branch_name, Model, val_loader, TestModel)
+			val_auroc = val_one_epoch(epoch, branch_name, Model, val_loader, criterion, TestModel)
 			lr_scheduler.step(val_auroc)
 
 			print(" Training epoch time: {}".format(datetime.now() - start_time_epoch))
 
-		# val_one_epoch(epoch, branch_name, Model, test_loader, TestModel)
+		val_auroc = val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion, TestModel, False)
 
 		print(" Training " + branch_name + " branch done")
 
