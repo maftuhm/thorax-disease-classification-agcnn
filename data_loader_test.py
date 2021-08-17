@@ -18,22 +18,34 @@ transform_train = transforms.Compose([
    normalize,
 ])
 
+
+transform_test = transforms.Compose([
+   transforms.Resize((256, 256)),
+   transforms.CenterCrop((224, 224)),
+   transforms.ToTensor(),
+   normalize,
+])
+
+def loop(loader):
+    for epoch in range(1, 5):
+        progressbar = tqdm(range(len(loader)))
+        for i, data in enumerate(loader):
+            progressbar.update(1)
+        progressbar.close()
+    del loader
+
 def main():
     pin_memory = True
     print(' pin_memory is', pin_memory)
     train_data = ChestXrayDataSet(data_dir = DATA_DIR, split = 'train', num_classes = 14, transform = transform_train)
-
-    for num_workers in range(0, 20, 1): 
-        train_loader = DataLoader(train_data, batch_size=16, num_workers=num_workers, pin_memory=pin_memory)
+    val_data = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = 14, transform = transform_test)
+    for num_workers in range(2, 10): 
+        train_loader = DataLoader(train_data, batch_size=16, shuffle = True, num_workers=num_workers, pin_memory=pin_memory)
+        val_loader = DataLoader(val_data, batch_size = 64, shuffle = False, num_workers=num_workers, pin_memory = pin_memory)
         start = time.time()
-        for epoch in range(1, 5):
-            progressbar = tqdm(range(len(train_loader)))
-            for i, data in enumerate(train_loader):
-                progressbar.update(1)
-            progressbar.close()
-        del train_loader
+        loop(train_loader)
+        loop(val_loader)
         end = time.time()
         print(" Finish with: {} seconds, num_workers={}\n".format(end - start, num_workers))
-
 if __name__ == "__main__":
     main()
