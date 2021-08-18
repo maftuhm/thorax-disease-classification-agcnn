@@ -66,6 +66,8 @@ BRANCH_NAMES = config['branch']
 BEST_AUROCs = {branch: -1000 for branch in BRANCH_NAMES}
 BEST_AUROCs['global'] = 0.82879
 
+BEST_LOSS = {branch: 1000 for branch in BRANCH_NAMES}
+
 MAX_BATCH_CAPACITY = {
 	'global' : 16,
 	'local' : 8,
@@ -150,11 +152,8 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 	writer.add_scalars("train/loss", {branch: epoch_loss}, epoch)
 	writer.add_scalars("train/learning_rate", {branch: optimizer.param_groups[0]['lr']}, epoch)
 
-	# SAVE MODEL
-	save_model(exp_dir_num, epoch, epoch_loss, model, optimizer, lr_scheduler, branch)
-
 @torch.no_grad()
-def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = None, val = True):
+def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = None):
 
 	print("\n Validating {} model".format(branch))
 
@@ -233,13 +232,6 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 
 	writer.add_scalars("val/AUROCs", {branch: AUROCs_mean}, epoch)
 
-	if AUROCs_mean > BEST_AUROCs[branch] and val:
-		BEST_AUROCs[branch] = AUROCs_mean
-		save_name = path.join(exp_dir_num, args.exp_num + '_' + branch + '.pth')
-		copy_name = os.path.join(exp_dir_num, args.exp_num + '_' + branch + '_best.pth')
-		shutil.copyfile(save_name, copy_name)
-		print(" Best model is saved: {}".format(copy_name))
-
 	print(' Best AUROCs: {:.5f}'.format(BEST_AUROCs[branch]))
 	print("|=======================================|")
 	print("|\t\t  AUROC\t\t\t|")
@@ -259,7 +251,7 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 	print("|=======================================|")
 	print()
 
-	return AUROCs_mean
+	return epoch_loss
 
 def main():
 	# ================= TRANSFORMS ================= #
@@ -366,7 +358,7 @@ def main():
 			raise Exception("optimizer must be SGD or Adam")
 
 		# lr_scheduler = optim.lr_scheduler.StepLR(optimizer , **config['lr_scheduler'])
-		lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', patience=2, verbose=True)
+		lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=2, verbose=True)
 
 		if args.resume:
 
@@ -377,6 +369,7 @@ def main():
 				Model.load_state_dict(save_dict['net'])
 				optimizer.load_state_dict(save_dict['optim'])
 				lr_scheduler.load_state_dict(save_dict['lr_scheduler'])
+				BEST_LOSS[branch_name] = save_dict['loss']
 				start_epoch = save_dict['epoch']
 				print(" Loaded " + branch_name + " branch model checkpoint from epoch " + str(start_epoch))
 				start_epoch += 1
@@ -390,12 +383,22 @@ def main():
 			start_time_epoch = datetime.now()
 
 			train_one_epoch(epoch, branch_name, Model, optimizer, lr_scheduler, train_loader, criterion, TestModel)
-			val_auroc = val_one_epoch(epoch, branch_name, Model, val_loader, criterion, TestModel)
-			lr_scheduler.step(val_auroc)
+			
+			val_loss = val_one_epoch(epoch, branch_name, Model, val_loader, criterion, TestModel)
+			lr_scheduler.step(val_loss)
+
+			save_model(exp_dir_num, epoch, val_loss, Model, optimizer, lr_scheduler, branch_name)
+
+			if val_loss < BEST_LOSS[branch_name]:
+				BEST_LOSS[branch_name] = val_loss
+				save_name = os.path.join(exp_dir_num, args.exp_num + '_' + branch_name + '.pth')
+				copy_name = os.path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best.pth')
+				shutil.copyfile(save_name, copy_name)
+				print(" Best model is saved: {}".format(copy_name))
 
 			print(" Training epoch time: {}".format(datetime.now() - start_time_epoch))
 
-		val_auroc = val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion, TestModel, False)
+		val_loss = val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion, TestModel)
 
 		print(" Training " + branch_name + " branch done")
 
