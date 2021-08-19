@@ -23,7 +23,6 @@ class ResAttCheXNet(nn.Module):
                                         num_classes = num_classes,
                                         last_pool = last_pool,
                                         lse_pool_controller = lse_pool_controller,
-                                        memory_efficient = True,
                                         **kwargs)
         else:
             raise Exception("backbone must be resnet50 or densenet121")

@@ -64,14 +64,14 @@ if 'num_classes' in list(config.keys()):
 NUM_CLASSES = len(CLASS_NAMES)
 BRANCH_NAMES = config['branch']
 BEST_AUROCs = {branch: -1000 for branch in BRANCH_NAMES}
-BEST_AUROCs['global'] = 0.82879
+# BEST_AUROCs['global'] = 0.82879
 
 BEST_LOSS = {branch: 1000 for branch in BRANCH_NAMES}
 
 MAX_BATCH_CAPACITY = {
-	'global' : 16,
-	'local' : 8,
-	'fusion' : 8
+	'global' : 12,
+	'local' : 6,
+	'fusion' : 6
 }
 
 cudnn.benchmark = True
@@ -232,7 +232,7 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 
 	writer.add_scalars("val/AUROCs", {branch: AUROCs_mean}, epoch)
 
-	print(' Best AUROCs: {:.5f}'.format(BEST_AUROCs[branch]))
+	print(' Best Loss: {:.5f}'.format(BEST_LOSS[branch]))
 	print("|=======================================|")
 	print("|\t\t  AUROC\t\t\t|")
 	print("|=======================================|")
@@ -358,7 +358,7 @@ def main():
 			raise Exception("optimizer must be SGD or Adam")
 
 		# lr_scheduler = optim.lr_scheduler.StepLR(optimizer , **config['lr_scheduler'])
-		lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=2, verbose=True)
+		lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=2, factor=0.1, verbose=True)
 
 		if args.resume:
 

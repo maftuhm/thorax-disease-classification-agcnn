@@ -39,7 +39,7 @@ class _DenseLayer(nn.Module):
     def bn_function(self, inputs):
         # type: (List[Tensor]) -> Tensor
         concated_features = torch.cat(inputs, 1)
-        bottleneck_output = self.conv1(self.controllerelu1(self.norm1(concated_features)))  # noqa: T484
+        bottleneck_output = self.conv1(self.relu1(self.norm1(concated_features)))  # noqa: T484
         return bottleneck_output
 
     # todo: rewrite when torchscript supports any
@@ -84,7 +84,7 @@ class _DenseLayer(nn.Module):
         else:
             bottleneck_output = self.bn_function(prev_features)
 
-        new_features = self.conv2(self.controllerelu2(self.norm2(bottleneck_output)))
+        new_features = self.conv2(self.relu2(self.norm2(bottleneck_output)))
         if self.drop_rate > 0:
             new_features = F.dropout(new_features, p=self.drop_rate,
                                      training=self.training)
@@ -207,7 +207,7 @@ class DenseNet(nn.Module):
         out = self.last_pool(out)
         flatten_pool = torch.flatten(out, 1)
         out = self.classifier(flatten_pool)
-        out = F.sigmoid(out)
+        out = torch.sigmoid(out)
         return out, features, flatten_pool
 
 def DenseNet121(pretrained = True, num_classes = 14, last_pool = 'lse', lse_pool_controller = 10, **kwargs):
