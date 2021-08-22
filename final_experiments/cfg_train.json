@@ -54,7 +54,7 @@
 			"last_pool" : "max"
 		},
 		"branch" : ["global"],
-		"optimizer" : "Adam",
+		"optimizer" : "SGD",
 		"loss" : "WeightedBCELoss",
 		"num_classes" : 14
 	},
@@ -65,7 +65,7 @@
 			"lse_pool_controller" : 10
 		},
 		"branch" : ["global"],
-		"optimizer" : "Adam",
+		"optimizer" : "SGD",
 		"loss" : "WeightedBCELoss",
 		"num_classes" : 14
 	},
@@ -76,7 +76,7 @@
 			"last_pool" : "avg"
 		},
 		"branch" : ["global"],
-		"optimizer" : "Adam",
+		"optimizer" : "SGD",
 		"loss" : "WeightedBCELoss",
 		"num_classes" : 14
 	},
@@ -87,7 +87,7 @@
 			"lse_pool_controller" : 8
 		},
 		"branch" : ["global"],
-		"optimizer" : "Adam",
+		"optimizer" : "SGD",
 		"loss" : "WeightedBCELoss",
 		"num_classes" : 14
 	},
@@ -98,7 +98,7 @@
 			"lse_pool_controller" : 12
 		},
 		"branch" : ["global"],
-		"optimizer" : "Adam",
+		"optimizer" : "SGD",
 		"loss" : "WeightedBCELoss",
 		"num_classes" : 14
 	},
