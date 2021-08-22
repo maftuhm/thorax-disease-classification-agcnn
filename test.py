@@ -213,6 +213,7 @@ def main():
 	print("| Average\t\t|  {:.10f}\t\t|  {:.10f}\t\t|  {:.10f}\t\t|".format(AUROCs_global_avg, AUROCs_local_avg, AUROCs_fusion_avg))
 	print("|===============================================================================================|")
 	print()
+	create_precision_recall_curve(ground_truth, pred_global)
 
 if __name__ == "__main__":
 	main()

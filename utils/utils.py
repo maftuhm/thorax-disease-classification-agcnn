@@ -5,8 +5,9 @@ import shutil
 import numpy as np
 from PIL import Image, ImageDraw
 
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, roc_curve, precision_recall_curve
 from skimage.measure import label
+import matplotlib.pyplot as plt
 
 import torch
 import torch.nn.functional as F
@@ -45,6 +46,60 @@ def compute_AUCs(gt, pred):
 	for i in range(len(gt_np[0])):
 		AUROCs.append(roc_auc_score(gt_np[:, i], pred_np[:, i]))
 	return AUROCs
+
+def create_roc_curve(gt, pred):
+	gt_np = gt.cpu().numpy()
+	pred_np = pred.cpu().numpy()
+
+	colors = [
+	'#0033cc', '#ff0000', '#ff9933', '#993399', '#009933', '#6699ff', '#cc3300',
+	'#006600', '#660066', '#00ffcc', '#ffff00', '#ff33cc', '#00cc99', '#660033']
+
+	linestyles = [
+	'solid', 'dotted', 'dashed', 'dashdot',
+	(0, (1, 1)), (0, (1, 5)), (0, (5, 5)), (0, (5, 1)),
+	(0, (3, 5, 1, 5)), (0, (3, 1, 1, 1)), 'solid', 'dashdot',
+	(0, (3, 5, 1, 5, 1, 5)), (0, (3, 1, 1, 1, 1, 1))]
+
+	for i in range(len(gt_np[0])):
+		fpr, tpr, thresholds = roc_curve(gt_np[:, i], pred_np[:, i])
+		gmeans = np.sqrt(tpr * (1-fpr))
+		ix = np.argmax(gmeans)
+		plt.plot([0,1], [0,1], linestyle='--')
+		plt.plot(fpr, tpr, linestyle=linestyles[i], color=colors[i], label='{} t={:.5f}'.format(CLASS_NAMES[i], thresholds[ix]))
+		plt.scatter(fpr[ix], tpr[ix], marker='o', color=colors[i])
+
+	plt.xlabel('False Positive Rate')
+	plt.ylabel('True Positive Rate')
+	plt.legend()
+	plt.show()
+
+def create_precision_recall_curve(gt, pred):
+	gt_np = gt.cpu().numpy()
+	pred_np = pred.cpu().numpy()
+
+	colors = [
+	'#0033cc', '#ff0000', '#ff9933', '#993399', '#009933', '#6699ff', '#cc3300',
+	'#006600', '#660066', '#00ffcc', '#ffff00', '#ff33cc', '#00cc99', '#660033']
+
+	linestyles = [
+	'solid', 'dotted', 'dashed', 'dashdot',
+	(0, (1, 1)), (0, (1, 5)), (0, (5, 5)), (0, (5, 1)),
+	(0, (3, 5, 1, 5)), (0, (3, 1, 1, 1)), 'solid', 'dashdot',
+	(0, (3, 5, 1, 5, 1, 5)), (0, (3, 1, 1, 1, 1, 1))]
+
+	for i in range(len(gt_np[0])):
+		precision, recall, thresholds = precision_recall_curve(gt_np[:, i], pred_np[:, i])
+		fscore = (2 * precision * recall) / (precision + recall)
+		ix = np.argmax(fscore)
+		plt.plot([0,1], [0,1], linestyle='--')
+		plt.plot(recall, precision, linestyle=linestyles[i], color=colors[i], label='{} t={:.5f} F={:.3f}'.format(CLASS_NAMES[i], thresholds[ix], fscore[ix]))
+		plt.scatter(recall[ix], precision[ix], marker='o', color=colors[i])
+
+	plt.xlabel('False Positive Rate')
+	plt.ylabel('True Positive Rate')
+	plt.legend()
+	plt.show()
 
 class UnNormalize(object):
 	def __init__(self, mean, std):
