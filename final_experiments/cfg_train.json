@@ -40,7 +40,7 @@
 	},
 	"exp4" : {
 		"net" : {
-			"backbone" : "densenet121",
+			"backbone" : "resnet50",
 			"last_pool" : "max"
 		},
 		"branch" : ["global"],
@@ -50,7 +50,7 @@
 	},
 	"exp5" : {
 		"net" : {
-			"backbone" : "densenet121",
+			"backbone" : "resnet50",
 			"last_pool" : "max"
 		},
 		"branch" : ["global"],
@@ -60,7 +60,7 @@
 	},
 	"exp6" : {
 		"net" : {
-			"backbone" : "densenet121",
+			"backbone" : "resnet50",
 			"last_pool" : "lse",
 			"lse_pool_controller" : 10
 		},
@@ -72,7 +72,7 @@
 	"_comment_open_": "optional setelah training semua sampe fusion",
 	"exp7" : {
 		"net" : {
-			"backbone" : "densenet121",
+			"backbone" : "resnet50",
 			"last_pool" : "avg"
 		},
 		"branch" : ["global"],
@@ -82,7 +82,7 @@
 	},
 	"exp8" : {
 		"net" : {
-			"backbone" : "densenet121",
+			"backbone" : "resnet50",
 			"last_pool" : "lse",
 			"lse_pool_controller" : 8
 		},
@@ -93,7 +93,7 @@
 	},
 	"exp9" : {
 		"net" : {
-			"backbone" : "densenet121",
+			"backbone" : "resnet50",
 			"last_pool" : "lse",
 			"lse_pool_controller" : 12
 		},

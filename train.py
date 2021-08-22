@@ -69,9 +69,9 @@ BEST_AUROCs = {branch: -1000 for branch in BRANCH_NAMES}
 BEST_LOSS = {branch: 1000 for branch in BRANCH_NAMES}
 
 MAX_BATCH_CAPACITY = {
-	'global' : 12,
-	'local' : 6,
-	'fusion' : 6
+	'global' : 16,
+	'local' : 8,
+	'fusion' : 8
 }
 
 cudnn.benchmark = True
