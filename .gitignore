@@ -4,3 +4,5 @@ labels/
 log/
 log.txt
 *.csv
+generate_data.py
+test_dataset.py

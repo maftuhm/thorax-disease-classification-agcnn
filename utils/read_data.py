@@ -1,10 +1,14 @@
-import torch
-from torch.utils.data import Dataset
-from PIL import Image
 import os
+import cv2
+import torch
+import numpy as np
+import sharearray
+from tqdm import tqdm
+from torch.utils.data import Dataset
+from numpy.lib.format import open_memmap
 
 class ChestXrayDataSet(Dataset):
-    def __init__(self, data_dir, split, num_classes=14, transform=None):
+    def __init__(self, data_dir, split, num_classes=14, transform=None, init_transform = None):
         """
         Args:
             data_dir: path to image directory.
@@ -13,21 +17,35 @@ class ChestXrayDataSet(Dataset):
             transform: optional transform to be applied on a sample.
         """
         assert split in {'train', 'test', 'val'}
-        
-        image_names = []
+
+        array_dir = os.path.join(data_dir, 'npy')
+        array_file = os.path.join(array_dir, 'array_' + split + '_images.npy')
+        os.makedirs(array_dir, exist_ok=True)
+
+        data_list = os.path.join(data_dir, 'labels', 'dummy_data_' + split + '_list.txt')
+
+        if os.path.isfile(array_file) is not True:
+            images = sharearray.cache(
+                split + '_images',
+                lambda: self.create_data_array(data_dir, data_list, init_transform),
+                shm_path=array_dir,
+                prefix='array_'
+            )
+            images.flush()
+            del images
+
+        self.images = open_memmap(array_file, mode='r+').astype(np.float32)
+
         labels = []
-        with open(os.path.join(data_dir, 'labels', 'my_' + split + '_list.txt'), "r") as f:
-            for line in f:
+        with open(data_list, "r") as file:
+            lines = file.readlines()
+            for line in lines:
                 items = line.split()
-                image_name= items[0]
                 label = items[1:num_classes+1]
                 label = [int(i) for i in label]
-                image_name = os.path.join(data_dir, 'images', image_name)
-                image_names.append(image_name)
                 labels.append(label)
 
-        self.image_names = image_names
-        self.labels = labels
+        self.labels = np.asarray(labels)
         self.transform = transform
 
     def __getitem__(self, index):
@@ -38,13 +56,36 @@ class ChestXrayDataSet(Dataset):
         Returns:
             image and its labels
         """
-        image_name = self.image_names[index]
-        image = Image.open(image_name).convert('RGB')
+        image = np.ascontiguousarray(np.asarray(self.images[index]))
         label = self.labels[index]
         if self.transform is not None:
             image = self.transform(image)
         return image, torch.FloatTensor(label)
 
     def __len__(self):
-        return len(self.image_names)
+        return len(self.labels)
+
+    def create_data_array(self, data_dir, data_list, transform):
+        
+        images = []
+        
+        with open(data_list, "r") as file:
+            
+            lines = file.readlines()
+            progressbar = tqdm(range(len(lines)))
+            for line in lines:
+                items = line.split()
+                image_name= items[0]
+                image_dir = os.path.join(data_dir, 'images', image_name)
+                image = cv2.imread(image_dir)
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+                if transform is not None:
+                    image = transform(image)
+
+                images.append(image)
+                progressbar.update(1)
+            progressbar.close()
+
+        return np.asarray(images)
 
