@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn.functional as F
 import torchvision
-import torchvision.transforms as transforms
+import torchvision.transforms as transforms_th
 from config import *
 
 def save_model(exp_dir, epoch, loss, model, optimizer, lr_scheduler, branch_name = 'global'):
@@ -120,14 +120,14 @@ class UnNormalize(object):
 		return out_tensor
 
 def draw_bounding_box(image, bbox, label = None):
-	img_to_draw = transforms.ToPILImage()(image)
+	img_to_draw = transforms_th.ToPILImage()(image)
 	draw = ImageDraw.Draw(img_to_draw)
 	draw.rectangle(bbox, outline=(0, 255, 0))
 
 	if label is not None:
 		draw.text((bbox[0] + 2, bbox[1]), label)
 
-	return transforms.ToTensor()(img_to_draw).unsqueeze(0)
+	return transforms_th.ToTensor()(img_to_draw).unsqueeze(0)
 
 def draw_heatmap(image, heatmap):
 	heatmap = np.uint8(255 * heatmap.numpy())
@@ -136,7 +136,7 @@ def draw_heatmap(image, heatmap):
 	img = cv2.cvtColor(np.uint8(255 * image.permute(1, 2, 0).numpy()), cv2.COLOR_RGB2BGR)
 	add_heatmap = cv2.cvtColor(cv2.addWeighted(img, 0.5, heatmap, 0.5, 0), cv2.COLOR_BGR2RGB)
 
-	return transforms.ToTensor()(Image.fromarray(add_heatmap)).unsqueeze(0)
+	return transforms_th.ToTensor()(Image.fromarray(add_heatmap)).unsqueeze(0)
 
 def draw_label_score(target, scores, size = (224, 224)):
 	new_images = Image.new('RGB', size, (255, 255, 255))
@@ -156,7 +156,7 @@ def draw_label_score(target, scores, size = (224, 224)):
 		draw_img.text((15, i * 15 + 10), text, fill = fill)
 		draw_img.text((150, i * 15 + 10), str(score)[:10], fill = fill)
 	
-	return transforms.ToTensor()(new_images).unsqueeze(0)
+	return transforms_th.ToTensor()(new_images).unsqueeze(0)
 
 def drawImage(images, target, scores, images_cropped = None, heatmaps = None, coordinates = None):
 	bz, c, h, w = images.shape # batch_size, channel, height, width

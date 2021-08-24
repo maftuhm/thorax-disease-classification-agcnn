@@ -22,7 +22,7 @@ class ChestXrayDataSet(Dataset):
         array_file = os.path.join(array_dir, 'array_' + split + '_images.npy')
         os.makedirs(array_dir, exist_ok=True)
 
-        data_list = os.path.join(data_dir, 'labels', 'dummy_data_' + split + '_list.txt')
+        data_list = os.path.join(data_dir, 'labels', 'my_' + split + '_list.txt')
 
         if os.path.isfile(array_file) is not True:
             images = sharearray.cache(

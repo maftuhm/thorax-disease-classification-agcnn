@@ -12,10 +12,11 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import torch.backends.cudnn as cudnn
 
-import torchvision.transforms as transforms
+# import torchvision.transforms as transforms
 
 from model import ResAttCheXNet, FusionNet
 from utils import WeightedBCELoss, AttentionMaskInference, ChestXrayDataSet
+from utils import transforms
 
 from utils.utils import *
 from config import *
@@ -69,7 +70,7 @@ BEST_AUROCs = {branch: -1000 for branch in BRANCH_NAMES}
 BEST_LOSS = {branch: 1000 for branch in BRANCH_NAMES}
 
 MAX_BATCH_CAPACITY = {
-	'global' : 16,
+	'global' : 12,
 	'local' : 8,
 	'fusion' : 8
 }
@@ -260,20 +261,19 @@ def main():
 	   std=[0.229, 0.224, 0.225]
 	)
 
-	transform_train = transforms.Compose([
-	   transforms.Resize(tuple(config['dataset']['resize'])),
+	transform_init = transforms.Resize(tuple(config['dataset']['resize']))
+	transform_train = transforms.Compose(
 	   transforms.RandomResizedCrop(tuple(config['dataset']['crop'])),
 	   transforms.RandomHorizontalFlip(),
 	   transforms.ToTensor(),
-	   normalize,
-	])
+	   normalize
+	)
 
-	transform_test = transforms.Compose([
-	   transforms.Resize(tuple(config['dataset']['resize'])),
+	transform_test = transforms.Compose(
 	   transforms.CenterCrop(tuple(config['dataset']['crop'])),
 	   transforms.ToTensor(),
-	   normalize,
-	])
+	   normalize
+	)
 
 	if args.resume:
 		pretrained = False
@@ -309,14 +309,14 @@ def main():
 		start_time_train = datetime.now()
 
 		# ================= LOAD DATASET ================= #
-		train_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'train', num_classes = NUM_CLASSES, transform = transform_train)
-		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 4, pin_memory = True)
+		train_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'train', num_classes = NUM_CLASSES, transform = transform_train, init_transform=transform_init)
+		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, pin_memory = True)
 
-		val_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'val', num_classes = NUM_CLASSES, transform = transform_test)
-		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, num_workers = 4, pin_memory = True)
+		val_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
+		val_loader = DataLoader(dataset = val_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = False, pin_memory = True)
 
-		test_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = NUM_CLASSES, transform = transform_test)
-		test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, num_workers = 4, pin_memory = True)
+		test_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
+		test_loader = DataLoader(dataset = test_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = False, pin_memory = True)
 
 		print(" Start training " + branch_name + " branch...")
 	
