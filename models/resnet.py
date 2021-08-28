@@ -223,7 +223,7 @@ class ResNet(nn.Module):
         x = self.last_pool(features)
         flatten_pool = torch.flatten(x, 1)
         x = self.fc(flatten_pool)
-        x = torch.sigmoid(x)
+        # x = torch.sigmoid(x)
 
         return x, features, flatten_pool
 

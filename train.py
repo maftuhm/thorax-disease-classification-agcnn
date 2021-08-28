@@ -24,7 +24,7 @@ from config import *
 def parse_args():
 	parser = argparse.ArgumentParser(description='AG-CNN')
 	parser.add_argument('--use', type=str, default='train', help='use for what (train or test)')
-	parser.add_argument("--exp_dir", type=str, default='./final_experiments', help='define experiment directory (ex: /exp16)')
+	parser.add_argument("--exp_dir", type=str, default='./experiments2', help='define experiment directory (ex: /exp16)')
 	parser.add_argument("--exp_num", type=str, default='exp0', help='define experiment directory (ex: /exp0)')
 	parser.add_argument("--resume", "-r", action="store_true")
 	args = parser.parse_args()
@@ -289,13 +289,6 @@ def main():
 		print(" Threshold \t\t:", config['threshold'])
 		FusionModel = FusionNet(backbone = config['net']['backbone'], num_classes = NUM_CLASSES)
 
-	if config['loss'] == 'BCELoss':
-		criterion = nn.BCELoss()
-	elif config['loss'] == 'WeightedBCELoss':
-		criterion = WeightedBCELoss(PosNegWeightIsDynamic = True)
-	else:
-		raise Exception("loss function must be BCELoss or WeightedBCELoss")
-
 	print(" Num classes \t\t:", NUM_CLASSES)
 	print(" Optimizer \t\t:", list(config['optimizer'].keys())[0])
 	print(" Loss function \t\t:", config['loss'])
@@ -313,6 +306,21 @@ def main():
 
 		test_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
 		test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, pin_memory = True)
+
+		if config['loss'] == 'BCELoss':
+			criterion = nn.BCELoss()
+		elif config['loss'] == 'WeightedBCELoss':
+			criterion = WeightedBCELoss(PosNegWeightIsDynamic = True)
+		elif config['loss'] == 'BCEWithLogitsLoss':
+			count_train_labels = torch.tensor(train_dataset.labels, dtype=torch.float32).sum(axis=0)
+			weight_train = (len(train_dataset) / count_train_labels) - 1
+			count_val_labels = torch.tensor(val_dataset.labels, dtype=torch.float32).sum(axis=0)
+			weight_val = (len(val_dataset) / count_val_labels) - 1
+			count_test_labels = torch.tensor(test_dataset.labels, dtype=torch.float32).sum(axis=0)
+			weight_test = (len(test_dataset) / count_test_labels) - 1
+			criterion = (nn.BCEWithLogitsLoss(pos_weight=weight_train), nn.BCEWithLogitsLoss(pos_weight=weight_val), nn.BCEWithLogitsLoss(pos_weight=weight_test))
+		else:
+			raise Exception("loss function must be BCELoss or WeightedBCELoss")
 
 		print(" Start training " + branch_name + " branch...")
 	
@@ -353,8 +361,8 @@ def main():
 		else:
 			raise Exception("optimizer must be SGD or Adam")
 
-		# lr_scheduler = optim.lr_scheduler.StepLR(optimizer , **config['lr_scheduler'])
-		lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=2, factor=0.1, verbose=True)
+		lr_scheduler = optim.lr_scheduler.StepLR(optimizer , **config['lr_scheduler'])
+		# lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=2, factor=0.1, verbose=True)
 
 		if args.resume:
 
@@ -378,9 +386,9 @@ def main():
 		for epoch in range(start_epoch, config['NUM_EPOCH']):
 			start_time_epoch = datetime.now()
 
-			train_one_epoch(epoch, branch_name, Model, optimizer, lr_scheduler, train_loader, criterion, TestModel)
+			train_one_epoch(epoch, branch_name, Model, optimizer, lr_scheduler, train_loader, criterion[0].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
 			
-			val_loss = val_one_epoch(epoch, branch_name, Model, val_loader, criterion, TestModel)
+			val_loss = val_one_epoch(epoch, branch_name, Model, val_loader, criterion[1].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
 			lr_scheduler.step(val_loss)
 
 			save_model(exp_dir_num, epoch, val_loss, Model, optimizer, lr_scheduler, branch_name)
@@ -394,7 +402,7 @@ def main():
 
 			print(" Training epoch time: {}".format(datetime.now() - start_time_epoch))
 
-		val_loss = val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion, TestModel)
+		val_loss = val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion[2].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
 
 		print(" Training " + branch_name + " branch done")
 
