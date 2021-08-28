@@ -94,6 +94,9 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 	progressbar = tqdm(range(len_data))
 	for i, (images, targets) in enumerate(data_loader):
 
+		# if (i + 1) > (len_data - len_data % batch_multiplier):
+		# 	batch_multiplier = len_data % batch_multiplier
+
 		if i == random_int:
 			images_draw = {}
 			images_draw['images'] = images.detach()
@@ -105,12 +108,16 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 				output_patches = test_model[1](images.detach(), output_global['features'].detach().cpu())
 				images = output_patches['crop']
 
+			del output_global
+
 		elif branch == 'fusion':
 			with torch.no_grad():
 				output_global = test_model[0](images.to(device, non_blocking=True))
 				output_patches = test_model[1](images.detach(), output_global['features'].detach().cpu())
 				output_local = test_model[2](output_patches['crop'].to(device, non_blocking=True))
 				images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
+
+			del output_global, output_local
 
 		images = images.to(device, non_blocking=True)
 		targets = targets.to(device, non_blocking=True)
@@ -138,6 +145,8 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 										output_patches['coordinate'])
 
 			writer.add_images("train/{}".format(branch), draw_image, epoch)
+			
+			del images_draw, draw_image
 
 		running_loss += loss.item() * batch_multiplier
 
@@ -150,6 +159,8 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 	print(' Epoch over Loss: {:.5f}'.format(epoch_loss))
 	writer.add_scalars("train/loss", {branch: epoch_loss}, epoch)
 	writer.add_scalars("train/learning_rate", {branch: optimizer.param_groups[0]['lr']}, epoch)
+	del images, targets, output, running_loss, epoch_loss
+	torch.cuda.empty_cache()
 
 @torch.no_grad()
 def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = None):
@@ -178,24 +189,22 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 			images_draw['targets'] = targets.detach()
 
 		if branch == 'local':
-			output_global = test_model[0](images.to(device))
+			output_global = test_model[0](images.to(device, non_blocking=True))
 			output_patches = test_model[1](images.detach(), output_global['features'].detach().cpu())
 			images = output_patches['crop']
 
 			del output_global
-			torch.cuda.empty_cache()
 		
 		elif branch == 'fusion':
-			output_global = test_model[0](images.to(device))
+			output_global = test_model[0](images.to(device, non_blocking=True))
 			output_patches = test_model[1](images.detach(), output_global['features'].detach().cpu())
-			output_local = test_model[2](output_patches['crop'].to(device))
+			output_local = test_model[2](output_patches['crop'].to(device, non_blocking=True))
 			images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
 
 			del output_global, output_local
-			torch.cuda.empty_cache()
 
-		images = images.to(device)
-		targets = targets.to(device)
+		images = images.to(device, non_blocking=True)
+		targets = targets.to(device, non_blocking=True)
 		gt = torch.cat((gt, targets.detach().cpu()), 0)
 
 		# be careful add last layer with sigmoid if using bceloss or weighted bce loss
@@ -217,7 +226,9 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 										output_patches['heatmap'].detach(),
 										output_patches['coordinate'])
 
+
 			writer.add_images("val/{}".format(branch), draw_image, epoch)
+			del images_draw, draw_image
 
 		progressbar.set_description(" Epoch: [{}/{}] | loss: {:.5f}".format(epoch,  config['NUM_EPOCH'] - 1, loss.item()))
 		progressbar.update(1)
@@ -251,6 +262,9 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 	print("| Average\t\t|  {:.10f}\t|".format(AUROCs_mean))
 	print("|=======================================|")
 	print()
+
+	del images, targets, output, running_loss
+	torch.cuda.empty_cache()
 
 	return epoch_loss
 
@@ -393,7 +407,7 @@ def main():
 			train_one_epoch(epoch, branch_name, Model, optimizer, lr_scheduler, train_loader, criterion[0].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
 			
 			val_loss = val_one_epoch(epoch, branch_name, Model, val_loader, criterion[1].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
-			lr_scheduler.step(val_loss)
+			lr_scheduler.step()
 
 			save_model(exp_dir_num, epoch, val_loss, Model, optimizer, lr_scheduler, branch_name)
 

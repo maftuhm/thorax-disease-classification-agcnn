@@ -28,7 +28,7 @@
 		"gamma" : 0.1
 	},
 	"max_batch" : {
-		"global" : 16,
+		"global" : 12,
 		"local" : 8,
 		"fusion" : 8
 	}
