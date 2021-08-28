@@ -69,11 +69,7 @@ BEST_AUROCs = {branch: -1000 for branch in BRANCH_NAMES}
 
 BEST_LOSS = {branch: 1000 for branch in BRANCH_NAMES}
 
-MAX_BATCH_CAPACITY = {
-	'global' : 12,
-	'local' : 8,
-	'fusion' : 8
-}
+MAX_BATCH_CAPACITY = config['max_batch']
 
 cudnn.benchmark = True
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -105,19 +101,19 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		if branch == 'local':
 			with torch.no_grad():
-				output_global = test_model[0](images.to(device))
+				output_global = test_model[0](images.to(device, non_blocking=True))
 				output_patches = test_model[1](images.detach(), output_global['features'].detach().cpu())
 				images = output_patches['crop']
 
 		elif branch == 'fusion':
 			with torch.no_grad():
-				output_global = test_model[0](images.to(device))
+				output_global = test_model[0](images.to(device, non_blocking=True))
 				output_patches = test_model[1](images.detach(), output_global['features'].detach().cpu())
-				output_local = test_model[2](output_patches['crop'].to(device))
+				output_local = test_model[2](output_patches['crop'].to(device, non_blocking=True))
 				images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
 
-		images = images.to(device)
-		targets = targets.to(device)
+		images = images.to(device, non_blocking=True)
+		targets = targets.to(device, non_blocking=True)
 
 		output = model(images)
 		loss = criterion(output['out'], targets) / batch_multiplier
@@ -263,7 +259,7 @@ def main():
 
 	transform_init = transforms.Resize(tuple(config['dataset']['resize']))
 	transform_train = transforms.Compose(
-	   transforms.RandomResizedCrop(tuple(config['dataset']['crop'])),
+	   transforms.RandomResizedCrop(tuple(config['dataset']['crop']), (0.25, 1.0)),
 	   transforms.RandomHorizontalFlip(),
 	   transforms.ToTensor(),
 	   normalize
@@ -312,11 +308,11 @@ def main():
 		train_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'train', num_classes = NUM_CLASSES, transform = transform_train, init_transform=transform_init)
 		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, pin_memory = True)
 
-		val_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		val_loader = DataLoader(dataset = val_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = False, pin_memory = True)
+		val_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'val', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
+		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, pin_memory = True)
 
 		test_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		test_loader = DataLoader(dataset = test_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = False, pin_memory = True)
+		test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, pin_memory = True)
 
 		print(" Start training " + branch_name + " branch...")
 	

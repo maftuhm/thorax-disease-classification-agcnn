@@ -136,5 +136,25 @@
 		"branch" : ["local", "fusion"],
 		"L_function" : "L2",
 		"threshold" : 0.7
+	},
+	"exp15" : {
+		"net" : {
+			"backbone" : "resnet50",
+			"last_pool" : "max"
+		},
+		"branch" : ["global"],
+		"optimizer" : "SGD",
+		"loss" : "BCELoss",
+		"max_batch" : {
+			"global" : 12,
+			"local" : 8,
+			"fusion" : 8
+		}
+	},
+	"exp16" : {
+		"net" : "exp15",
+		"branch" : ["local", "fusion"],
+		"L_function" : "Lmax",
+		"threshold" : 0.7
 	}
 }

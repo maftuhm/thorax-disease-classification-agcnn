@@ -34,7 +34,7 @@ class ChestXrayDataSet(Dataset):
             images.flush()
             del images
 
-        self.images = open_memmap(array_file, mode='r+').astype(np.float32)
+        self.images = open_memmap(array_file, mode='r+')
 
         labels = []
         with open(data_list, "r") as file:
@@ -56,7 +56,7 @@ class ChestXrayDataSet(Dataset):
         Returns:
             image and its labels
         """
-        image = np.ascontiguousarray(np.asarray(self.images[index]))
+        image = np.ascontiguousarray(np.asarray(self.images[index], dtype=np.float32))
         label = self.labels[index]
         if self.transform is not None:
             image = self.transform(image)
