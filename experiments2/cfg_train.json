@@ -2,7 +2,7 @@
 	"exp0" : {
 		"net" : {
 			"backbone" : "resnet50",
-			"last_pool" : "max",
+			"last_pool" : "max"
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",

@@ -115,6 +115,8 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 		images = images.to(device, non_blocking=True)
 		targets = targets.to(device, non_blocking=True)
 
+		# be careful add last layer with sigmoid if using bceloss or weighted bce loss
+		# and remove sigimoid(output) here
 		output = model(images)
 		loss = criterion(output['out'], targets) / batch_multiplier
 		loss.backward()
@@ -196,6 +198,8 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 		targets = targets.to(device)
 		gt = torch.cat((gt, targets.detach().cpu()), 0)
 
+		# be careful add last layer with sigmoid if using bceloss or weighted bce loss
+		# and remove sigimoid(output) here
 		output = model(images)
 		loss = criterion(output['out'], targets)
 		running_loss += loss.item()
