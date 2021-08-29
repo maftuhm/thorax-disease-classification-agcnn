@@ -84,6 +84,6 @@ class FusionNet(nn.Module):
             out = self.relu(out)
             out = self.fc3(out)
 
-        # out = self.sigmoid(out)
+        out = self.sigmoid(out)
 
         return {'out': out}

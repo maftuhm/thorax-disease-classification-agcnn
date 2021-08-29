@@ -207,7 +207,7 @@ class DenseNet(nn.Module):
         out = self.last_pool(out)
         flatten_pool = torch.flatten(out, 1)
         out = self.classifier(flatten_pool)
-        # out = torch.sigmoid(out)
+        out = torch.sigmoid(out)
         return out, features, flatten_pool
 
 def DenseNet121(pretrained = True, num_classes = 14, last_pool = 'lse', lse_pool_controller = 10, **kwargs):

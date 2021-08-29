@@ -135,11 +135,11 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		if i == random_int:
 			if branch == 'global':
-				draw_image = drawImage(images_draw['images'], images_draw['targets'], torch.sigmoid(output['out']).detach())
+				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['out'].detach())
 			else:
 				draw_image = drawImage(images_draw['images'],
 										images_draw['targets'],
-										torch.sigmoid(output['out']).detach(),
+										output['out'].detach(),
 										output_patches['crop'].detach(),
 										output_patches['heatmap'].detach(),
 										output_patches['coordinate'])
@@ -213,15 +213,15 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 		loss = criterion(output['out'], targets)
 		running_loss += loss.item()
 
-		pred = torch.cat((pred, torch.sigmoid(output['out']).detach().cpu()), 0)
+		pred = torch.cat((pred, output['out'].detach().cpu()), 0)
 
 		if i == random_int:
 			if branch == 'global':
-				draw_image = drawImage(images_draw['images'], images_draw['targets'], torch.sigmoid(output['out']).detach())
+				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['out'].detach())
 			else:
 				draw_image = drawImage(images_draw['images'],
 										images_draw['targets'],
-										torch.sigmoid(output['out']).detach(),
+										output['out'].detach(),
 										output_patches['crop'].detach(),
 										output_patches['heatmap'].detach(),
 										output_patches['coordinate'])
