@@ -15,7 +15,8 @@
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",
-		"loss" : "BCELoss"
+		"loss" : "WeightedBCELoss",
+		"NUM_EPOCH" : 100
 	},
 	"exp2" : {
 		"net" : {
@@ -24,8 +25,7 @@
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",
-		"loss" : "BCELoss",
-		"num_classes" : 14
+		"loss" : "BCELoss"
 	},
 	"exp3" : {
 		"net" : {

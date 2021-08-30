@@ -94,8 +94,8 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 	progressbar = tqdm(range(len_data))
 	for i, (images, targets) in enumerate(data_loader):
 
-		# if (i + 1) > (len_data - len_data % batch_multiplier):
-		# 	batch_multiplier = len_data % batch_multiplier
+		if (i + 1) > (len_data - len_data % batch_multiplier):
+			batch_multiplier = len_data % batch_multiplier
 
 		if i == random_int:
 			images_draw = {}
@@ -104,7 +104,7 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		if branch == 'local':
 			with torch.no_grad():
-				output_global = test_model[0](images.to(device, non_blocking=True))
+				output_global = test_model[0](images.to(device))
 				output_patches = test_model[1](images.detach(), output_global['features'].detach().cpu())
 				images = output_patches['crop']
 
@@ -112,15 +112,15 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		elif branch == 'fusion':
 			with torch.no_grad():
-				output_global = test_model[0](images.to(device, non_blocking=True))
+				output_global = test_model[0](images.to(device))
 				output_patches = test_model[1](images.detach(), output_global['features'].detach().cpu())
-				output_local = test_model[2](output_patches['crop'].to(device, non_blocking=True))
+				output_local = test_model[2](output_patches['crop'].to(device))
 				images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
 
 			del output_global, output_local
 
-		images = images.to(device, non_blocking=True)
-		targets = targets.to(device, non_blocking=True)
+		images = images.to(device)
+		targets = targets.to(device)
 
 		# be careful add last layer with sigmoid if using bceloss or weighted bce loss
 		# and remove sigimoid(output) here
@@ -189,22 +189,22 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 			images_draw['targets'] = targets.detach()
 
 		if branch == 'local':
-			output_global = test_model[0](images.to(device, non_blocking=True))
+			output_global = test_model[0](images.to(device))
 			output_patches = test_model[1](images.detach(), output_global['features'].detach().cpu())
 			images = output_patches['crop']
 
 			del output_global
 		
 		elif branch == 'fusion':
-			output_global = test_model[0](images.to(device, non_blocking=True))
+			output_global = test_model[0](images.to(device))
 			output_patches = test_model[1](images.detach(), output_global['features'].detach().cpu())
-			output_local = test_model[2](output_patches['crop'].to(device, non_blocking=True))
+			output_local = test_model[2](output_patches['crop'].to(device))
 			images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
 
 			del output_global, output_local
 
-		images = images.to(device, non_blocking=True)
-		targets = targets.to(device, non_blocking=True)
+		images = images.to(device)
+		targets = targets.to(device)
 		gt = torch.cat((gt, targets.detach().cpu()), 0)
 
 		# be careful add last layer with sigmoid if using bceloss or weighted bce loss
@@ -317,13 +317,13 @@ def main():
 
 		# ================= LOAD DATASET ================= #
 		train_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'train', num_classes = NUM_CLASSES, transform = transform_train, init_transform=transform_init)
-		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, pin_memory = True)
+		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 0, pin_memory = True, drop_last=True)
 
 		val_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'val', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, pin_memory = True)
+		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, num_workers = 0, pin_memory = True)
 
 		test_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, pin_memory = True)
+		test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, num_workers = 0, pin_memory = True)
 
 		if config['loss'] == 'BCELoss':
 			criterion = nn.BCELoss()
