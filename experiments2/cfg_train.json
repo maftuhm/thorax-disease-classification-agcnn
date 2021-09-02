@@ -15,8 +15,7 @@
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",
-		"loss" : "WeightedBCELoss",
-		"NUM_EPOCH" : 100
+		"loss" : "WeightedBCELoss"
 	},
 	"exp2" : {
 		"net" : {
@@ -29,34 +28,26 @@
 	},
 	"exp3" : {
 		"net" : {
-			"backbone" : "densenet121",
-			"last_pool" : "max"
+			"backbone" : "resnet50",
+			"last_pool" : "lse",
+			"lse_pool_controller" : 10
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",
-		"loss" : "BCELoss",
-		"num_classes" : 14
+		"loss" : "WeightedBCELoss"
 	},
+	"_comment_open3_": "lse with abs max and without clamp in WeightedBCELoss",
 	"exp4" : {
 		"net" : {
 			"backbone" : "resnet50",
-			"last_pool" : "max"
-		},
-		"branch" : ["global"],
-		"optimizer" : "Adam",
-		"loss" : "BCELoss",
-		"num_classes" : 14
-	},
-	"exp5" : {
-		"net" : {
-			"backbone" : "resnet50",
-			"last_pool" : "max"
+			"last_pool" : "lse",
+			"lse_pool_controller" : 10
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",
-		"loss" : "WeightedBCELoss",
-		"num_classes" : 14
+		"loss" : "WeightedBCELoss"
 	},
+	"_comment_close3_": "lse with abs max and without clamp in WeightedBCELoss",
 	"exp6" : {
 		"net" : {
 			"backbone" : "resnet50",
