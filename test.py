@@ -12,10 +12,11 @@ from torch.utils.data import DataLoader
 # from torch.utils.tensorboard import SummaryWriter
 import torch.backends.cudnn as cudnn
 
-import torchvision.transforms as transforms
+# import torchvision.transforms as transforms
 
 from model import ResAttCheXNet, FusionNet
 from utils import WeightedBCELoss, AttentionMaskInference, ChestXrayDataSet
+from utils import transforms
 
 from utils.utils import *
 from config import *
@@ -75,17 +76,17 @@ def main():
 	   std=[0.229, 0.224, 0.225]
 	)
 
-	transform_test = transforms.Compose([
+	transform_test = transforms.Compose(
 	   transforms.Resize(tuple(config['dataset']['resize'])),
 	   transforms.CenterCrop(tuple(config['dataset']['crop'])),
 	   transforms.ToTensor(),
 	   normalize,
-	])
+	)
 
 	# ================= LOAD DATASET ================= #
 
 	test_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = NUM_CLASSES, transform = transform_test)
-	test_loader = DataLoader(dataset = test_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = False, num_workers = 4, pin_memory = True)
+	test_loader = DataLoader(dataset = test_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = False, num_workers = 0, pin_memory = True)
 
 	# ================= MODELS ================= #
 	GlobalModel = ResAttCheXNet(pretrained = False, num_classes = NUM_CLASSES, **config['net']).to(device)
@@ -213,7 +214,7 @@ def main():
 	print("| Average\t\t|  {:.10f}\t\t|  {:.10f}\t\t|  {:.10f}\t\t|".format(AUROCs_global_avg, AUROCs_local_avg, AUROCs_fusion_avg))
 	print("|===============================================================================================|")
 	print()
-	create_precision_recall_curve(ground_truth, pred_global)
+	# create_precision_recall_curve(ground_truth, pred_global)
 
 if __name__ == "__main__":
 	main()
