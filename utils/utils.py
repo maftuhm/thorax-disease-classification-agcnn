@@ -15,9 +15,10 @@ import torchvision
 import torchvision.transforms as transforms_th
 from config import *
 
-def save_model(exp_dir, epoch, loss, model, optimizer, lr_scheduler, branch_name = 'global'):
+def save_model(exp_dir, epoch, auroc, loss, model, optimizer, lr_scheduler, branch_name = 'global'):
 	save_dict = {
 		"epoch": epoch,
+		"auroc": auroc,
 		"loss": loss,
 		"net": model.state_dict(),
 		"optim": optimizer.state_dict(),
