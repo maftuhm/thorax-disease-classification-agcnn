@@ -48,7 +48,7 @@
 		"loss" : "WeightedBCELoss"
 	},
 	"_comment_close3_": "lse with abs max and without clamp in WeightedBCELoss",
-	"exp6" : {
+	"exp5" : {
 		"net" : {
 			"backbone" : "resnet50",
 			"last_pool" : "lse",
@@ -56,51 +56,17 @@
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",
-		"loss" : "WeightedBCELoss",
-		"num_classes" : 14
+		"loss" : "BCELoss"
 	},
-	"_comment_open_": "optional setelah training semua sampe fusion",
-	"exp7" : {
+	"exp6" : {
 		"net" : {
 			"backbone" : "resnet50",
-			"last_pool" : "avg"
+			"last_pool" : "max"
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",
-		"loss" : "WeightedBCELoss",
-		"num_classes" : 14
+		"loss" : "WeightedBCELoss"
 	},
-	"exp8" : {
-		"net" : {
-			"backbone" : "resnet50",
-			"last_pool" : "lse",
-			"lse_pool_controller" : 8
-		},
-		"branch" : ["global"],
-		"optimizer" : "SGD",
-		"loss" : "WeightedBCELoss",
-		"num_classes" : 14
-	},
-	"exp9" : {
-		"net" : {
-			"backbone" : "resnet50",
-			"last_pool" : "lse",
-			"lse_pool_controller" : 12
-		},
-		"branch" : ["global"],
-		"optimizer" : "SGD",
-		"loss" : "WeightedBCELoss",
-		"num_classes" : 14
-	},
-	"_comment_close_": "optional setelah training semua sampe fusion",
-
-	"exp10" : {
-		"net" : "exp6",
-		"branch" : ["local", "fusion"],
-		"L_function" : "Lmax",
-		"threshold" : 0.7
-	},
-
 	"_comment_open1_": "optional setelah training semua sampe fusion dan kalo sempet threshold 0.1-0.9",
 	"exp11" : {
 		"net" : "exp6",
