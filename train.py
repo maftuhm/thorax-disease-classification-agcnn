@@ -64,10 +64,10 @@ if 'num_classes' in list(config.keys()):
 
 NUM_CLASSES = len(CLASS_NAMES)
 BRANCH_NAMES = config['branch']
-BEST_AUROCs = {branch: -1000 for branch in BRANCH_NAMES}
+BEST_AUROCs = {branch: 0.8 for branch in BRANCH_NAMES}
 # BEST_AUROCs['global'] = 0.82879
 
-BEST_LOSS = {branch: 1000 for branch in BRANCH_NAMES}
+BEST_LOSS = {branch: 0 for branch in BRANCH_NAMES}
 
 MAX_BATCH_CAPACITY = config['max_batch']
 
@@ -244,7 +244,7 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 
 	writer.add_scalars("val/AUROCs", {branch: AUROCs_mean}, epoch)
 
-	print(' Best Loss: {:.5f}'.format(BEST_LOSS[branch]))
+	print(' Best AUROCs: {:.5f} | Best Loss: {:.5f}'.format(BEST_AUROCs[branch], BEST_LOSS[branch]))
 	print("|=======================================|")
 	print("|\t\t  AUROC\t\t\t|")
 	print("|=======================================|")
@@ -266,7 +266,7 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 	del images, targets, output, running_loss
 	torch.cuda.empty_cache()
 
-	return epoch_loss, AUROCs_mean
+	return AUROCs_mean, epoch_loss
 
 def main():
 	# ================= TRANSFORMS ================= #
@@ -407,22 +407,23 @@ def main():
 
 			train_one_epoch(epoch, branch_name, Model, optimizer, lr_scheduler, train_loader, criterion[0].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
 			
-			val_loss, val_auroc = val_one_epoch(epoch, branch_name, Model, val_loader, criterion[1].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
+			val_auroc, val_loss = val_one_epoch(epoch, branch_name, Model, val_loader, criterion[1].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
 			lr_scheduler.step()
 
 			save_model(exp_dir_num, epoch, val_auroc, val_loss, Model, optimizer, lr_scheduler, branch_name)
 
 			save_name = os.path.join(exp_dir_num, args.exp_num + '_' + branch_name + '.pth')
+			if val_auroc > BEST_AUROCs[branch_name]:
+				BEST_AUROCs[branch_name] = val_auroc
+				copy_name = os.path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_auroc.pth')
+				shutil.copyfile(save_name, copy_name)
+				print(" Best model based on AUROCs is saved: {}".format(copy_name))
+
 			if val_loss < BEST_LOSS[branch_name]:
 				BEST_LOSS[branch_name] = val_loss
 				copy_name = os.path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_loss.pth')
 				shutil.copyfile(save_name, copy_name)
 				print(" Best model based on loss is saved: {}".format(copy_name))
-			if val_auroc < BEST_AUROCs[branch_name]:
-				BEST_AUROCs[branch_name] = val_auroc
-				copy_name = os.path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_auroc.pth')
-				shutil.copyfile(save_name, copy_name)
-				print(" Best model based on AUROCs is saved: {}".format(copy_name))
 
 			print(" Training epoch time: {}".format(datetime.now() - start_time_epoch))
 
