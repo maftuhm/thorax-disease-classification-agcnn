@@ -26,6 +26,7 @@ def parse_args():
 	parser.add_argument("--exp_dir", type=str, default='./final_experiments', help='define experiment directory (ex: /exp16)')
 	parser.add_argument("--exp_num", type=str, default='exp0', help='define experiment directory (ex: /exp0)')
 	parser.add_argument("--best_model", "-b", action="store_true")
+	parser.add_argument("--loss", "-l", action="store_true")
 	parser.add_argument("--branch", type=str, default='all', help='define branch global or all')
 	args = parser.parse_args()
 	return args
@@ -100,6 +101,11 @@ def main():
 		add_text = '_best'
 	else:
 		add_text = ''
+
+	if args.loss:
+		add_text += '_loss'
+	else:
+		add_text += '_auroc'
 
 	checkpoint_global = os.path.join(exp_dir_num, args.exp_num + '_global' + add_text + '.pth')
 	if args.branch == 'all':

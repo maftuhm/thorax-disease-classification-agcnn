@@ -58,6 +58,7 @@
 		"optimizer" : "SGD",
 		"loss" : "BCELoss"
 	},
+	"_comment_open4_": "training with new split data",
 	"exp6" : {
 		"net" : {
 			"backbone" : "resnet50",
@@ -67,12 +68,23 @@
 		"optimizer" : "SGD",
 		"loss" : "WeightedBCELoss"
 	},
+	"exp7" : {
+		"net" : {
+			"backbone" : "resnet50",
+			"last_pool" : "lse",
+			"lse_pool_controller" : 10
+		},
+		"branch" : ["global"],
+		"optimizer" : "SGD",
+		"loss" : "WeightedBCELoss"
+	},
+	"_comment_close4_": "training with new split data",
 	"_comment_open1_": "optional setelah training semua sampe fusion dan kalo sempet threshold 0.1-0.9",
-	"exp11" : {
+	"exp8" : {
 		"net" : "exp6",
 		"branch" : ["local", "fusion"],
 		"L_function" : "Lmax",
-		"threshold" : 0.6
+		"threshold" : 0.7
 	},
 	"exp12" : {
 		"net" : "exp6",

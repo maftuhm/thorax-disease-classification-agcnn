@@ -67,7 +67,7 @@ BRANCH_NAMES = config['branch']
 BEST_AUROCs = {branch: 0.8 for branch in BRANCH_NAMES}
 # BEST_AUROCs['global'] = 0.82879
 
-BEST_LOSS = {branch: 0 for branch in BRANCH_NAMES}
+BEST_LOSS = {branch: 1000. for branch in BRANCH_NAMES}
 
 MAX_BATCH_CAPACITY = config['max_batch']
 
@@ -347,7 +347,7 @@ def main():
 			TestModel = None
 
 		if branch_name == 'local':
-			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best' + '.pth'))
+			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_loss' + '.pth'))
 			GlobalModel.load_state_dict(save_dict_global['net'])
 
 			for param in GlobalModel.parameters():
@@ -357,8 +357,8 @@ def main():
 			TestModel = (GlobalModel.to(device), AttentionGenPatchs)
 
 		if branch_name == 'fusion':
-			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best' + '.pth'))
-			save_dict_local = torch.load(os.path.join(exp_dir_num, args.exp_num + '_local_best' + '.pth'))
+			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_loss' + '.pth'))
+			save_dict_local = torch.load(os.path.join(exp_dir_num, args.exp_num + '_local_best_loss' + '.pth'))
 
 			GlobalModel.load_state_dict(save_dict_global['net'])
 			LocalModel.load_state_dict(save_dict_local['net'])
@@ -391,7 +391,7 @@ def main():
 				Model.load_state_dict(save_dict['net'])
 				optimizer.load_state_dict(save_dict['optim'])
 				lr_scheduler.load_state_dict(save_dict['lr_scheduler'])
-				BEST_LOSS[branch_name] = save_dict.get('loss', 0)
+				BEST_LOSS[branch_name] = save_dict.get('loss', 1.)
 				BEST_AUROCs[branch_name] = save_dict.get('auroc', 0.8)
 				start_epoch = save_dict['epoch']
 				print(" Loaded " + branch_name + " branch model checkpoint from epoch " + str(start_epoch))
