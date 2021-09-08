@@ -19,17 +19,20 @@ class ChestXrayDataSet(Dataset):
         assert split in {'train', 'test', 'val'}
 
         array_dir = os.path.join(data_dir, 'npy')
-        array_file = os.path.join(array_dir, 'array_' + split + '_images_2.npy')
         os.makedirs(array_dir, exist_ok=True)
 
-        data_list = os.path.join(data_dir, 'labels', 'new_' + split + '_list.txt')
+        filename        = 'array_' + split + '_images'
+        filename_list   = 'my_' + split + '_list'
+
+        array_file      = os.path.join(array_dir, filename + '.npy')
+        data_list       = os.path.join(data_dir, 'labels', filename_list + '.txt')
 
         if os.path.isfile(array_file) is not True:
             images = sharearray.cache(
-                split + '_images_2',
+                filename,
                 lambda: self.create_data_array(data_dir, data_list, init_transform),
                 shm_path=array_dir,
-                prefix='array_'
+                prefix=''
             )
             images.flush()
             del images
