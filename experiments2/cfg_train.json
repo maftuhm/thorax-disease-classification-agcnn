@@ -86,11 +86,11 @@
 		"L_function" : "Lmax",
 		"threshold" : 0.7
 	},
-	"exp12" : {
+	"exp9" : {
 		"net" : "exp6",
 		"branch" : ["local", "fusion"],
-		"L_function" : "Lmax",
-		"threshold" : 0.8
+		"L_function" : "L2",
+		"threshold" : 0.7
 	},
 	"_comment_close2_": "optional setelah training semua sampe fusion dan kalo sempet threshold 0.1-0.9",
 	"exp13" : {

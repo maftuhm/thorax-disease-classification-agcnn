@@ -80,9 +80,6 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 	model.train()
 	optimizer.zero_grad()
 
-	if test_model is not None:
-		for i in range(len(test_model)): test_model[i].eval()
-
 	running_loss = 0.
 	len_data = len(data_loader)
 	random_int = int(torch.randint(0, len_data, (1,))[0])
@@ -104,17 +101,17 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		if branch == 'local':
 			with torch.no_grad():
-				output_global = test_model[0](images.to(device))
-				output_patches = test_model[1](images.detach(), output_global['features'].detach().cpu())
+				output_global = test_model['global'](images.to(device))
+				output_patches = test_model['attention'](images.detach(), output_global['features'].detach().cpu())
 				images = output_patches['crop']
 
 			del output_global
 
 		elif branch == 'fusion':
 			with torch.no_grad():
-				output_global = test_model[0](images.to(device))
-				output_patches = test_model[1](images.detach(), output_global['features'].detach().cpu())
-				output_local = test_model[2](output_patches['crop'].to(device))
+				output_global = test_model['global'](images.to(device))
+				output_patches = test_model['attention'](images.detach(), output_global['features'].detach().cpu())
+				output_local = test_model['local'](output_patches['crop'].to(device))
 				images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
 
 			del output_global, output_local
@@ -168,9 +165,6 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 	print("\n Validating {} model".format(branch))
 
 	model.eval()
-
-	if test_model is not None:
-		for i in range(len(test_model)): test_model[i].eval()
 	
 	gt = torch.FloatTensor()
 	pred = torch.FloatTensor()
@@ -189,16 +183,16 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 			images_draw['targets'] = targets.detach()
 
 		if branch == 'local':
-			output_global = test_model[0](images.to(device))
-			output_patches = test_model[1](images.detach(), output_global['features'].detach().cpu())
+			output_global = test_model['global'](images.to(device))
+			output_patches = test_model['attention'](images.detach(), output_global['features'].detach().cpu())
 			images = output_patches['crop']
 
 			del output_global
 		
 		elif branch == 'fusion':
-			output_global = test_model[0](images.to(device))
-			output_patches = test_model[1](images.detach(), output_global['features'].detach().cpu())
-			output_local = test_model[2](output_patches['crop'].to(device))
+			output_global = test_model['global'](images.to(device))
+			output_patches = test_model['attention'](images.detach(), output_global['features'].detach().cpu())
+			output_local = test_model['local'](output_patches['crop'].to(device))
 			images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
 
 			del output_global, output_local
@@ -354,7 +348,12 @@ def main():
 				param.requires_grad = False
 
 			Model = LocalModel.to(device)
-			TestModel = (GlobalModel.to(device), AttentionGenPatchs)
+			TestModel = {
+				'global' : GlobalModel.to(device),
+				'attention': AttentionGenPatchs
+			}
+
+			for key in TestModel: TestModel[key].eval()
 
 		if branch_name == 'fusion':
 			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_loss' + '.pth'))
@@ -370,7 +369,12 @@ def main():
 				param.requires_grad = False
 
 			Model = FusionModel.to(device)
-			TestModel = (GlobalModel.to(device), AttentionGenPatchs, LocalModel.to(device))
+			TestModel = {
+				'global' : GlobalModel.to(device), 
+				'attention' : AttentionGenPatchs, 
+				'local' : LocalModel.to(device)
+			}
+			for key in TestModel: TestModel[key].eval()
 
 		if 'SGD' in config['optimizer']:
 			optimizer = optim.SGD(Model.parameters(), **config['optimizer']['SGD'])
@@ -391,7 +395,7 @@ def main():
 				Model.load_state_dict(save_dict['net'])
 				optimizer.load_state_dict(save_dict['optim'])
 				lr_scheduler.load_state_dict(save_dict['lr_scheduler'])
-				BEST_LOSS[branch_name] = save_dict.get('loss', 1.)
+				BEST_LOSS[branch_name] = save_dict.get('loss', 1000.)
 				BEST_AUROCs[branch_name] = save_dict.get('auroc', 0.8)
 				start_epoch = save_dict['epoch']
 				print(" Loaded " + branch_name + " branch model checkpoint from epoch " + str(start_epoch))
