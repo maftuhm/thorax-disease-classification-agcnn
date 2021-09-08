@@ -401,7 +401,7 @@ def main():
 				print(" Loaded " + branch_name + " branch model checkpoint from epoch " + str(start_epoch))
 				start_epoch += 1
 			else:
-				start_epoch = 0
+				raise Exception("File model is not found")
 
 		else:
 			start_epoch = 0
