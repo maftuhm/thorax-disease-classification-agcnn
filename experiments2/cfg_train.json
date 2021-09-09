@@ -79,7 +79,6 @@
 		"loss" : "WeightedBCELoss"
 	},
 	"_comment_close4_": "training with new split data",
-	"_comment_open1_": "optional setelah training semua sampe fusion dan kalo sempet threshold 0.1-0.9",
 	"exp8" : {
 		"net" : "exp6",
 		"branch" : ["local", "fusion"],
@@ -92,12 +91,16 @@
 		"L_function" : "L2",
 		"threshold" : 0.7
 	},
-	"_comment_close2_": "optional setelah training semua sampe fusion dan kalo sempet threshold 0.1-0.9",
-	"exp13" : {
+	"exp10" : {
 		"net" : "exp6",
 		"branch" : ["local", "fusion"],
 		"L_function" : "L1",
-		"threshold" : 0.7
+		"threshold" : 0.7,
+		"max_batch" : {
+			"global" : 16,
+			"local" : 16,
+			"fusion" : 16
+		}
 	},
 	"exp14" : {
 		"net" : "exp6",
