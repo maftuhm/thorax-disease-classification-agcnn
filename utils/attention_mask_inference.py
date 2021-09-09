@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 import numpy as np
 from skimage.measure import label
+from transforms import Normalize
 
 def L1(feature, axis = 0):
     output = torch.abs(feature)
@@ -61,10 +62,9 @@ class AttentionMaskInference(nn.Module):
 
     def forward(self, x, features):
         heatmap = self.distance(features)
-        out_heatmap = self.resize(heatmap.unsqueeze(1)).squeeze(1)
+        feature_conv = self.resize(heatmap.unsqueeze(1)).squeeze(1)
 
-        heatmap = (out_heatmap > self.threshold).float()
-        out, coords = self.crop_resize(x, heatmap)
+        out, coords = self.crop_resize(x, feature_conv)
 
         output = {
             'crop' : out,
@@ -73,12 +73,17 @@ class AttentionMaskInference(nn.Module):
         }
         return output
     
-    def crop_resize(self, images, heatmaps):
-
+    def crop_resize(self, images, feature_conv):
+        feature_conv = feature_conv.numpy()
+        bz, nc, h, w = feature_conv.shape
         out = torch.zeros_like(images)
+
         coords = []
-        for i in range(images.size(0)):
-            heatmap = torch.from_numpy(selectMaxConnect(heatmaps[i]))
+        for i in range(bz):
+            heatmap_bin = np.uint8(255 * features_conv[i])
+            heatmap_bin = binImage(heatmap_bin, self.threshold)
+            heatmap_maxconn = selectMaxConnect(heatmap_bin)
+            heatmap = torch.from_numpy(heatmap_bin * heatmap_maxconn)
             coord = torch.nonzero(heatmap, as_tuple = False)
             xmin = torch.min(coord[:,0])
             xmax = torch.max(coord[:,0])
@@ -90,3 +95,10 @@ class AttentionMaskInference(nn.Module):
             coords.append([ymin, xmin, ymax, xmax])
 
         return out, coords
+
+    def binImage(self, heatmap, threshold = 0.7, thresh_otsu = False):
+        if thresh_otsu:
+            _, heatmap_bin = cv2.threshold(heatmap , 0 , 255 , cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        else:
+            _, heatmap_bin = cv2.threshold(heatmap , int(255 * threshold) , 255 , cv2.THRESH_BINARY)
+        return heatmap_bin
