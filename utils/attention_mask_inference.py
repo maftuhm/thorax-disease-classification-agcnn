@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import numpy as np
+import cv2
 from skimage.measure import label
-from transforms import Normalize
 
 def L1(feature, axis = 0):
     output = torch.abs(feature)
@@ -44,6 +44,14 @@ def selectMaxConnect(heatmap):
     lcc = lcc + 0
     return lcc 
 
+
+def binImage(heatmap, threshold = 0.7, thresh_otsu = False):
+    if thresh_otsu:
+        _, heatmap_bin = cv2.threshold(heatmap , 0 , 255 , cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    else:
+        _, heatmap_bin = cv2.threshold(heatmap , int(255 * threshold) , 255 , cv2.THRESH_BINARY)
+    return heatmap_bin
+
 class AttentionMaskInference(nn.Module):
     def __init__(self, threshold = 0.7, distance_function = "Lmax", size = (224, 224), mode = 'bilinear'):
         super(AttentionMaskInference, self).__init__()
@@ -68,20 +76,20 @@ class AttentionMaskInference(nn.Module):
 
         output = {
             'crop' : out,
-            'heatmap' : out_heatmap,
+            'heatmap' : heatmap,
             'coordinate' : coords
         }
         return output
     
     def crop_resize(self, images, feature_conv):
         feature_conv = feature_conv.numpy()
-        bz, nc, h, w = feature_conv.shape
+        bz, nc, h, w = images.shape
         out = torch.zeros_like(images)
 
         coords = []
         for i in range(bz):
-            heatmap_bin = np.uint8(255 * features_conv[i])
-            heatmap_bin = binImage(heatmap_bin, self.threshold)
+            heatmap_bin = np.uint8(255 * feature_conv[i])
+            heatmap_bin = binImage(heatmap_bin, thresh_otsu=True)
             heatmap_maxconn = selectMaxConnect(heatmap_bin)
             heatmap = torch.from_numpy(heatmap_bin * heatmap_maxconn)
             coord = torch.nonzero(heatmap, as_tuple = False)
@@ -95,10 +103,3 @@ class AttentionMaskInference(nn.Module):
             coords.append([ymin, xmin, ymax, xmax])
 
         return out, coords
-
-    def binImage(self, heatmap, threshold = 0.7, thresh_otsu = False):
-        if thresh_otsu:
-            _, heatmap_bin = cv2.threshold(heatmap , 0 , 255 , cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-        else:
-            _, heatmap_bin = cv2.threshold(heatmap , int(255 * threshold) , 255 , cv2.THRESH_BINARY)
-        return heatmap_bin
