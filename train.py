@@ -64,7 +64,7 @@ if 'num_classes' in list(config.keys()):
 
 NUM_CLASSES = len(CLASS_NAMES)
 BRANCH_NAMES = config['branch']
-BEST_AUROCs = {branch: 0.8 for branch in BRANCH_NAMES}
+BEST_AUROCs = {branch: 0. for branch in BRANCH_NAMES}
 # BEST_AUROCs['global'] = 0.82879
 
 BEST_LOSS = {branch: 1000. for branch in BRANCH_NAMES}

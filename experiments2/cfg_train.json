@@ -106,7 +106,7 @@
 		"net" : "exp6",
 		"branch" : ["local", "fusion"],
 		"L_function" : "L1",
-		"threshold" : 0.6,
+		"threshold" : 0.3,
 		"max_batch" : {
 			"global" : 16,
 			"local" : 16,
