@@ -70,13 +70,13 @@ class AttentionMaskInference(nn.Module):
 
     def forward(self, x, features):
         heatmap = self.distance(features)
-        feature_conv = self.resize(heatmap.unsqueeze(1)).squeeze(1)
+        out_heatmap = self.resize(heatmap.unsqueeze(1)).squeeze(1)
 
-        out, coords = self.crop_resize(x, feature_conv)
+        out, coords = self.crop_resize(x, out_heatmap)
 
         output = {
             'crop' : out,
-            'heatmap' : heatmap,
+            'heatmap' : out_heatmap,
             'coordinate' : coords
         }
         return output
