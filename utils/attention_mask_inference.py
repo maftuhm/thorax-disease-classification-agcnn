@@ -70,28 +70,24 @@ class AttentionMaskInference(nn.Module):
 
     def forward(self, x, features):
         heatmap = self.distance(features)
-        heatmap = self.resize(heatmap.unsqueeze(1)).squeeze(1)
+        out_heatmap = self.resize(heatmap.unsqueeze(1)).squeeze(1)
 
+        heatmap = (out_heatmap > self.threshold).float()
         out, coords = self.crop_resize(x, heatmap)
 
         output = {
             'crop' : out,
-            'heatmap' : heatmap,
+            'heatmap' : out_heatmap,
             'coordinate' : coords
         }
         return output
     
-    def crop_resize(self, images, feature_conv):
-        feature_conv = feature_conv.numpy()
-        bz, nc, h, w = images.shape
-        out = torch.zeros_like(images)
+    def crop_resize(self, images, heatmaps):
 
+        out = torch.zeros_like(images)
         coords = []
-        for i in range(bz):
-            heatmap_bin = np.uint8(255 * feature_conv[i])
-            heatmap_bin = binImage(heatmap_bin, threshold=self.threshold)
-            heatmap_maxconn = selectMaxConnect(heatmap_bin)
-            heatmap = torch.from_numpy(heatmap_bin * heatmap_maxconn)
+        for i in range(images.size(0)):
+            heatmap = heatmaps[i] * torch.from_numpy(selectMaxConnect(heatmaps[i]))
             coord = torch.nonzero(heatmap, as_tuple = False)
             xmin = torch.min(coord[:,0])
             xmax = torch.max(coord[:,0])
