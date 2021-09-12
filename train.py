@@ -100,21 +100,21 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 			images_draw['targets'] = targets.detach()
 
 		if branch == 'local':
-			with torch.no_grad():
-				output_global = test_model['global'](images.to(device))
-				output_patches = test_model['attention'](images.detach(), output_global['features'].detach().cpu())
-				images = output_patches['crop']
+			# with torch.no_grad():
+			output_global = test_model['global'](images.to(device))
+			output_patches = test_model['attention'](images.detach(), output_global['features'].detach().cpu())
+			images = output_patches['crop']
 
-			del output_global
+			# del output_global
 
 		elif branch == 'fusion':
-			with torch.no_grad():
-				output_global = test_model['global'](images.to(device))
-				output_patches = test_model['attention'](images.detach(), output_global['features'].detach().cpu())
-				output_local = test_model['local'](output_patches['crop'].to(device))
-				images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
+			# with torch.no_grad():
+			output_global = test_model['global'](images.to(device))
+			output_patches = test_model['attention'](images.detach(), output_global['features'].detach().cpu())
+			output_local = test_model['local'](output_patches['crop'].to(device))
+			images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
 
-			del output_global, output_local
+			# del output_global, output_local
 
 		images = images.to(device)
 		targets = targets.to(device)
@@ -344,8 +344,8 @@ def main():
 			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_loss' + '.pth'))
 			GlobalModel.load_state_dict(save_dict_global['net'])
 
-			for param in GlobalModel.parameters():
-				param.requires_grad = False
+			# for param in GlobalModel.parameters():
+			# 	param.requires_grad = False
 
 			Model = LocalModel.to(device)
 			TestModel = {
@@ -353,7 +353,7 @@ def main():
 				'attention': AttentionGenPatchs
 			}
 
-			for key in TestModel: TestModel[key].eval()
+			# for key in TestModel: TestModel[key].eval()
 
 		if branch_name == 'fusion':
 			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_loss' + '.pth'))
@@ -362,11 +362,11 @@ def main():
 			GlobalModel.load_state_dict(save_dict_global['net'])
 			LocalModel.load_state_dict(save_dict_local['net'])
 
-			for param in GlobalModel.parameters():
-				param.requires_grad = False
+			# for param in GlobalModel.parameters():
+			# 	param.requires_grad = False
 
-			for param in LocalModel.parameters():
-				param.requires_grad = False
+			# for param in LocalModel.parameters():
+			# 	param.requires_grad = False
 
 			Model = FusionModel.to(device)
 			TestModel = {
@@ -374,7 +374,7 @@ def main():
 				'attention' : AttentionGenPatchs, 
 				'local' : LocalModel.to(device)
 			}
-			for key in TestModel: TestModel[key].eval()
+			# for key in TestModel: TestModel[key].eval()
 
 		if 'SGD' in config['optimizer']:
 			optimizer = optim.SGD(Model.parameters(), **config['optimizer']['SGD'])
