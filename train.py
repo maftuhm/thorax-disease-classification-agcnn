@@ -78,6 +78,11 @@ writer = SummaryWriter(exp_dir_num + '/log')
 def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, criterion, test_model = None):
 
 	model.train()
+
+	if test_model is not None:
+		for key in test_model:
+			test_model[key].train()
+
 	optimizer.zero_grad()
 
 	running_loss = 0.
@@ -165,6 +170,10 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 	print("\n Validating {} model".format(branch))
 
 	model.eval()
+
+	if test_model is not None:
+		for key in test_model:
+			test_model[key].eval()
 	
 	gt = torch.FloatTensor()
 	pred = torch.FloatTensor()
@@ -353,7 +362,7 @@ def main():
 				'attention': AttentionGenPatchs
 			}
 
-			# for key in TestModel: TestModel[key].eval()
+			for key in TestModel: TestModel[key].eval()
 
 		if branch_name == 'fusion':
 			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_loss' + '.pth'))
