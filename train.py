@@ -362,7 +362,7 @@ def main():
 				'attention': AttentionGenPatchs
 			}
 
-			for key in TestModel: TestModel[key].eval()
+			# for key in TestModel: TestModel[key].eval()
 
 		if branch_name == 'fusion':
 			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_loss' + '.pth'))
