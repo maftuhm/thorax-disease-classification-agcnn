@@ -110,7 +110,7 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 			output_patches = test_model['attention'](images.detach(), output_global['features'].detach().cpu())
 			images = output_patches['crop']
 
-			# del output_global
+			del output_global
 
 		elif branch == 'fusion':
 			# with torch.no_grad():
@@ -119,7 +119,7 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 			output_local = test_model['local'](output_patches['crop'].to(device))
 			images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
 
-			# del output_global, output_local
+			del output_global, output_local
 
 		images = images.to(device)
 		targets = targets.to(device)
