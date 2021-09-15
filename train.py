@@ -79,9 +79,10 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 	model.train()
 
-	if test_model is not None:
-		for key in test_model:
-			test_model[key].train()
+	# if test_model is not None:
+	# 	for key in test_model:
+	# 		if key != 'attention':
+	# 			test_model[key].train()
 
 	optimizer.zero_grad()
 
@@ -171,9 +172,10 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 
 	model.eval()
 
-	if test_model is not None:
-		for key in test_model:
-			test_model[key].eval()
+	# if test_model is not None:
+	# 	for key in test_model:
+	# 		if key != 'attention':
+	# 			test_model[key].eval()
 	
 	gt = torch.FloatTensor()
 	pred = torch.FloatTensor()
@@ -323,10 +325,10 @@ def main():
 		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 0, pin_memory = True, drop_last=True)
 
 		val_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'val', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, num_workers = 0, pin_memory = True)
+		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 8, shuffle = False, num_workers = 0, pin_memory = True)
 
 		test_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, num_workers = 0, pin_memory = True)
+		test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 8, shuffle = False, num_workers = 0, pin_memory = True)
 
 		if config['loss'] == 'BCELoss':
 			criterion = nn.BCELoss()
@@ -361,8 +363,8 @@ def main():
 				'global' : GlobalModel.to(device),
 				'attention': AttentionGenPatchs
 			}
-
-			# for key in TestModel: TestModel[key].eval()
+			# TestModel['attention'].eval()
+			for key in TestModel: TestModel[key].eval()
 
 		if branch_name == 'fusion':
 			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_loss' + '.pth'))
@@ -383,7 +385,8 @@ def main():
 				'attention' : AttentionGenPatchs, 
 				'local' : LocalModel.to(device)
 			}
-			# for key in TestModel: TestModel[key].eval()
+			# TestModel['attention'].eval()
+			for key in TestModel: TestModel[key].eval()
 
 		if 'SGD' in config['optimizer']:
 			optimizer = optim.SGD(Model.parameters(), **config['optimizer']['SGD'])
@@ -400,17 +403,20 @@ def main():
 			checkpoint = path.join(exp_dir_num, args.exp_num + '_' + branch_name + '.pth')
 
 			if path.isfile(checkpoint):
+				save_dict_best_loss = torch.load(path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_loss.pth'))
+				save_dict_best_auroc = torch.load(path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_auroc.pth'))
+
 				save_dict = torch.load(checkpoint)
 				Model.load_state_dict(save_dict['net'])
 				optimizer.load_state_dict(save_dict['optim'])
 				lr_scheduler.load_state_dict(save_dict['lr_scheduler'])
-				BEST_LOSS[branch_name] = save_dict.get('loss', 1000.)
-				BEST_AUROCs[branch_name] = save_dict.get('auroc', 0.8)
+				BEST_LOSS[branch_name] = save_dict_best_loss.get('loss', 1000.)
+				BEST_AUROCs[branch_name] = save_dict_best_auroc.get('auroc', 0.)
 				start_epoch = save_dict['epoch']
 				print(" Loaded " + branch_name + " branch model checkpoint from epoch " + str(start_epoch))
 				start_epoch += 1
 			else:
-				raise Exception("File model is not found")
+				start_epoch = 0
 
 		else:
 			start_epoch = 0
@@ -440,7 +446,9 @@ def main():
 
 			print(" Training epoch time: {}".format(datetime.now() - start_time_epoch))
 
-		val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion[2].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
+		# val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion[2].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
+		del Model, TestModel, train_dataset, train_loader, val_dataset, val_loader, test_dataset, test_loader, criterion, optimizer
+		torch.cuda.empty_cache()
 
 		print(" Training " + branch_name + " branch done")
 
