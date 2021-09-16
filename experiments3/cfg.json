@@ -1,0 +1,35 @@
+{
+	"NUM_EPOCH" : 60,
+	"num_classes" : 14,
+	"dataset" : {
+		"resize" : [256, 256],
+		"crop" : [224, 224]
+	},
+	"batch_size" : {
+		"global" : 128,
+		"local" : 128,
+		"fusion" : 128
+	},
+	"optimizer" : {
+		"SGD" : {
+			"lr" : 0.01,
+			"momentum" : 0.9,
+			"weight_decay" : 0.0001
+		},
+		"Adam" : {
+			"lr": 0.01,
+			"betas": [0.9, 0.999], 
+			"eps": 1e-08, 
+			"weight_decay" : 0.0001
+		}
+	},
+	"lr_scheduler" : {
+		"step_size" : 20, 
+		"gamma" : 0.1
+	},
+	"max_batch" : {
+		"global" : 16,
+		"local" : 14,
+		"fusion" : 4
+	}
+}
