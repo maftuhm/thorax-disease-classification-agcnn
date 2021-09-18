@@ -79,10 +79,10 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 	model.train()
 
-	# if test_model is not None:
-	# 	for key in test_model:
-	# 		if key != 'attention':
-	# 			test_model[key].train()
+	if test_model is not None:
+		for key in test_model:
+			if key != 'attention':
+				test_model[key].train()
 
 	optimizer.zero_grad()
 
@@ -172,10 +172,10 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 
 	model.eval()
 
-	# if test_model is not None:
-	# 	for key in test_model:
-	# 		if key != 'attention':
-	# 			test_model[key].eval()
+	if test_model is not None:
+		for key in test_model:
+			if key != 'attention':
+				test_model[key].eval()
 	
 	gt = torch.FloatTensor()
 	pred = torch.FloatTensor()
@@ -364,7 +364,7 @@ def main():
 				'attention': AttentionGenPatchs
 			}
 			# TestModel['attention'].eval()
-			for key in TestModel: TestModel[key].eval()
+			# for key in TestModel: TestModel[key].eval()
 
 		if branch_name == 'fusion':
 			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_loss' + '.pth'))
@@ -386,7 +386,7 @@ def main():
 				'local' : LocalModel.to(device)
 			}
 			# TestModel['attention'].eval()
-			for key in TestModel: TestModel[key].eval()
+			# for key in TestModel: TestModel[key].eval()
 
 		if 'SGD' in config['optimizer']:
 			optimizer = optim.SGD(Model.parameters(), **config['optimizer']['SGD'])
@@ -446,7 +446,7 @@ def main():
 
 			print(" Training epoch time: {}".format(datetime.now() - start_time_epoch))
 
-		# val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion[2].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
+		val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion[2].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
 		del Model, TestModel, train_dataset, train_loader, val_dataset, val_loader, test_dataset, test_loader, criterion, optimizer
 		torch.cuda.empty_cache()
 
