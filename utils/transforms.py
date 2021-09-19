@@ -2,7 +2,7 @@ import torch
 import cv2
 import math
 import numpy as np
-from torchvision.transforms import Normalize as Normalize_th
+from torchvision.transforms.functional import normalize as normalize_tv
 
 class CustomTransform:
     def __call__(self, *args, **kwargs):
@@ -171,10 +171,27 @@ class ToTensor(CustomTransform):
 
 class Normalize(CustomTransform):
     def __init__(self, mean, std, inplace=False):
-        self.transform = Normalize_th(mean, std, inplace)
+        self.mean = mean
+        self.std = std
+        self.inplace = inplace
+
+    def __call__(self, tensor):
+        return normalize_tv(tensor, self.mean, self.std, self.inplace)
+
+class DynamicNormalize(CustomTransform):
+    def __init__(inplace=False):
+        self.inplace = inplace
 
     def __call__(self, tensor):
         return self.transform(tensor)
+
+    def transform(self, tensor):
+        out_tensor = torch.FloatTensor()
+        for t in tensor:
+            t = normalize_tv(t, t.mean(), t.std(), inplace = self.inplace).unsqueeze(0)
+            out_tensor = torch.cat((out_tensor, t), dim = 0)
+        return out_tensor
+
 
 class UnNormalize(CustomTransform):
     def __init__(self, mean, std):

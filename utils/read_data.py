@@ -21,8 +21,8 @@ class ChestXrayDataSet(Dataset):
         array_dir = os.path.join(data_dir, 'npy')
         os.makedirs(array_dir, exist_ok=True)
 
-        filename        = 'array_' + split + '_images_2'
-        filename_list   = 'new_' + split + '_list'
+        filename        = 'my_array_' + split + '_images_gray'
+        filename_list   = 'my_' + split + '_list'
 
         array_file      = os.path.join(array_dir, filename + '.npy')
         data_list       = os.path.join(data_dir, 'labels', filename_list + '.txt')
@@ -69,19 +69,18 @@ class ChestXrayDataSet(Dataset):
         return len(self.labels)
 
     def create_data_array(self, data_dir, data_list, transform):
-        
+
         images = []
-        
+
         with open(data_list, "r") as file:
-            
+
             lines = file.readlines()
             progressbar = tqdm(range(len(lines)))
             for line in lines:
                 items = line.split()
                 image_name= items[0]
                 image_dir = os.path.join(data_dir, 'images', image_name)
-                image = cv2.imread(image_dir)
-                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                image = cv2.imread(image_dir, cv2.IMREAD_GRAYSCALE)
 
                 if transform is not None:
                     image = transform(image)
