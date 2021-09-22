@@ -99,13 +99,13 @@ def main():
 
 	if args.best_model:
 		add_text = '_best'
+
+		if args.loss:
+			add_text += '_loss'
+		else:
+			add_text += '_auroc'
 	else:
 		add_text = ''
-
-	if args.loss:
-		add_text += '_loss'
-	else:
-		add_text += '_auroc'
 
 	checkpoint_global = os.path.join(exp_dir_num, args.exp_num + '_global' + add_text + '.pth')
 	if args.branch == 'all':
@@ -117,17 +117,23 @@ def main():
 		save_dict = torch.load(checkpoint_global)
 		GlobalModel.load_state_dict(save_dict['net'])
 		print(" Loaded Global Branch Model checkpoint from epoch", save_dict['epoch'])
+	else:
+		raise Exception("Global Model does not exist")
 
 	if args.branch == 'all':
 		if os.path.isfile(checkpoint_local):
 			save_dict = torch.load(checkpoint_local)
 			LocalModel.load_state_dict(save_dict['net'])
 			print(" Loaded Local Branch Model checkpoint from epoch", save_dict['epoch'])
+		else:
+			raise Exception("Local Model does not exist")
 
 		if os.path.isfile(checkpoint_fusion):
 			save_dict = torch.load(checkpoint_fusion)
 			FusionModel.load_state_dict(save_dict['net'])
 			print(" Loaded Fusion Branch Model checkpoint from epoch", save_dict['epoch'])
+		else:
+			raise Exception("Fusion Model does not exist")
 
 	write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs.csv'),
 						data = ['Model'] + CLASS_NAMES + ['Mean'],

@@ -17,6 +17,24 @@
 			"fusion" : 4
 		}
 	},
+	"chexnet2" : {
+		"net" : {
+			"backbone" : "densenet121",
+			"last_pool" : "max"
+		},
+		"branch" : ["global"],
+		"optimizer" : "Adam",
+		"loss" : "BCELoss",
+		"lr_scheduler" : {
+			"step_size" : 10, 
+			"gamma" : 0.1
+		},
+		"max_batch" : {
+			"global" : 12,
+			"local" : 10,
+			"fusion" : 4
+		}
+	},
 	"chestxray14" : {
 		"net" : {
 			"backbone" : "resnet50",
@@ -34,6 +52,11 @@
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",
-		"loss" : "BCELoss"
+		"loss" : "BCELoss",
+		"max_batch" : {
+			"global" : 12,
+			"local" : 10,
+			"fusion" : 4
+		}
 	}
 }

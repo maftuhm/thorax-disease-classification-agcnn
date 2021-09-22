@@ -163,8 +163,8 @@ def drawImage(images, target, scores, images_cropped = None, heatmaps = None, co
 	bz, c, h, w = images.shape # batch_size, channel, height, width
 
 	unnormalize = UnNormalize(
-		mean=[0.4979839647692935],
-		std=[0.22962109349599796]
+		mean=[0.485, 0.456, 0.406],
+		std=[0.229, 0.224, 0.225]
 	)
 	img = torch.empty(0, dtype = images.dtype)
 	img_scores = torch.empty(0, dtype = images.dtype)

@@ -65,9 +65,10 @@ if 'num_classes' in list(config.keys()):
 NUM_CLASSES = len(CLASS_NAMES)
 BRANCH_NAMES = config['branch']
 BEST_AUROCs = {branch: 0. for branch in BRANCH_NAMES}
-# BEST_AUROCs['global'] = 0.82879
+# BEST_AUROCs['global'] = 0.82966
 
 BEST_LOSS = {branch: 1000. for branch in BRANCH_NAMES}
+# BEST_LOSS['global'] = 0.13489
 
 MAX_BATCH_CAPACITY = config['max_batch']
 
@@ -276,18 +277,23 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 def main():
 	# ================= TRANSFORMS ================= #
 
+	normalize = transforms.Normalize(
+	   mean=[0.485, 0.456, 0.406],
+	   std=[0.229, 0.224, 0.225]
+	)
+
 	transform_init = transforms.Resize(tuple(config['dataset']['resize']))
 	transform_train = transforms.Compose(
 	   transforms.RandomResizedCrop(tuple(config['dataset']['crop']), (0.5, 1.0)),
 	   transforms.RandomHorizontalFlip(),
 	   transforms.ToTensor(),
-	   transforms.DynamicNormalize()
+	   normalize
 	)
 
 	transform_test = transforms.Compose(
 	   transforms.CenterCrop(tuple(config['dataset']['crop'])),
 	   transforms.ToTensor(),
-	   transforms.DynamicNormalize()
+	   normalize
 	)
 
 	if args.resume:
@@ -317,14 +323,14 @@ def main():
 		start_time_train = datetime.now()
 
 		# ================= LOAD DATASET ================= #
-		train_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'train', num_classes = NUM_CLASSES, transform = transform_train, init_transform=transform_init)
+		train_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'train_val', num_classes = NUM_CLASSES, transform = transform_train, init_transform=transform_init)
 		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 0, pin_memory = True, drop_last=True)
 
-		val_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'val', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
+		val_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
 		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 8, shuffle = False, num_workers = 0, pin_memory = True)
 
-		test_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 8, shuffle = False, num_workers = 0, pin_memory = True)
+		# test_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
+		# test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 8, shuffle = False, num_workers = 0, pin_memory = True)
 
 		if config['loss'] == 'BCELoss':
 			criterion = nn.BCELoss()
@@ -442,7 +448,7 @@ def main():
 
 			print(" Training epoch time: {}".format(datetime.now() - start_time_epoch))
 
-		val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion[2].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
+		# val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion[2].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
 		del Model, TestModel, train_dataset, train_loader, val_dataset, val_loader, test_dataset, test_loader, criterion, optimizer
 		torch.cuda.empty_cache()
 

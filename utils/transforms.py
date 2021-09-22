@@ -166,7 +166,8 @@ class ToTensor(CustomTransform):
         self.dtype=dtype
 
     def __call__(self, img):
-        return torch.from_numpy(img).type(self.dtype).unsqueeze(0) / 255.
+        img = img.transpose(2, 0, 1)
+        return torch.from_numpy(img).type(self.dtype) / 255.
 
 class Normalize(CustomTransform):
     def __init__(self, mean, std, inplace=False):
@@ -178,7 +179,7 @@ class Normalize(CustomTransform):
         return normalize_tv(tensor, self.mean, self.std, self.inplace)
 
 class DynamicNormalize(CustomTransform):
-    def __init__(inplace=False):
+    def __init__(self, inplace=False):
         self.inplace = inplace
 
     def __call__(self, tensor):
