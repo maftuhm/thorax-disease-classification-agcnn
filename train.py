@@ -323,14 +323,14 @@ def main():
 		start_time_train = datetime.now()
 
 		# ================= LOAD DATASET ================= #
-		train_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'train_val', num_classes = NUM_CLASSES, transform = transform_train, init_transform=transform_init)
+		train_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'train', num_classes = NUM_CLASSES, transform = transform_train, init_transform=transform_init)
 		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 0, pin_memory = True, drop_last=True)
 
-		val_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
+		val_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'val', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
 		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 8, shuffle = False, num_workers = 0, pin_memory = True)
 
-		# test_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		# test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 8, shuffle = False, num_workers = 0, pin_memory = True)
+		test_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
+		test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 8, shuffle = False, num_workers = 0, pin_memory = True)
 
 		if config['loss'] == 'BCELoss':
 			criterion = nn.BCELoss()
@@ -403,6 +403,8 @@ def main():
 		if args.resume:
 
 			checkpoint = path.join(exp_dir_num, args.exp_num + '_' + branch_name + '.pth')
+			checkpoint_best_auroc = path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_auroc.pth')
+			checkpoint_best_loss = path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_loss.pth')
 
 			if path.isfile(checkpoint):
 				save_dict_best_loss = torch.load(path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_loss.pth'))
@@ -412,13 +414,20 @@ def main():
 				Model.load_state_dict(save_dict['net'])
 				optimizer.load_state_dict(save_dict['optim'])
 				lr_scheduler.load_state_dict(save_dict['lr_scheduler'])
-				BEST_LOSS[branch_name] = save_dict_best_loss.get('loss', 1000.)
-				BEST_AUROCs[branch_name] = save_dict_best_auroc.get('auroc', 0.)
 				start_epoch = save_dict['epoch']
 				print(" Loaded " + branch_name + " branch model checkpoint from epoch " + str(start_epoch))
 				start_epoch += 1
 			else:
-				start_epoch = 0
+				raise Exception("checkpoint model does not exist")
+
+			if path.isfile(checkpoint_best_auroc) and path.isfile(checkpoint_best_loss):
+				save_dict_best_loss = torch.load(checkpoint_best_loss)
+				save_dict_best_auroc = torch.load(checkpoint_best_auroc)
+				BEST_LOSS[branch_name] = save_dict_best_loss.get('loss', 1000.)
+				BEST_AUROCs[branch_name] = save_dict_best_auroc.get('auroc', 0.)
+				print(" latest best loss:", BEST_LOSS[branch_name])
+				print(" latest best auroc:", BEST_AUROCs[branch_name])
+				del save_dict_best_loss, save_dict_best_auroc
 
 		else:
 			start_epoch = 0
@@ -448,7 +457,7 @@ def main():
 
 			print(" Training epoch time: {}".format(datetime.now() - start_time_epoch))
 
-		# val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion[2].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
+		val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion[2].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
 		del Model, TestModel, train_dataset, train_loader, val_dataset, val_loader, test_dataset, test_loader, criterion, optimizer
 		torch.cuda.empty_cache()
 
@@ -457,4 +466,5 @@ def main():
 		print(" Training time {} branch: {}".format(branch_name, datetime.now() - start_time_train))
 
 if __name__ == "__main__":
+	torch.cuda.empty_cache()
 	main()

@@ -21,8 +21,8 @@ class ChestXrayDataSet(Dataset):
         array_dir = os.path.join(data_dir, 'npy')
         os.makedirs(array_dir, exist_ok=True)
 
-        filename        = 'official_array_' + split + '_images'
-        filename_list   = 'official_' + split + '_list'
+        filename        = 'my_array_' + split + '_images'
+        filename_list   = 'my_' + split + '_list'
 
         array_file      = os.path.join(array_dir, filename + '.npy')
         data_list       = os.path.join(data_dir, 'labels', filename_list + '.txt')
