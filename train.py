@@ -277,23 +277,23 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 def main():
 	# ================= TRANSFORMS ================= #
 
-	normalize = transforms.Normalize(
-	   mean=[0.485, 0.456, 0.406],
-	   std=[0.229, 0.224, 0.225]
-	)
+	# normalize = transforms.Normalize(
+	#    mean=[0.485, 0.456, 0.406],
+	#    std=[0.229, 0.224, 0.225]
+	# )
 
 	transform_init = transforms.Resize(tuple(config['dataset']['resize']))
 	transform_train = transforms.Compose(
 	   transforms.RandomResizedCrop(tuple(config['dataset']['crop']), (0.5, 1.0)),
 	   transforms.RandomHorizontalFlip(),
 	   transforms.ToTensor(),
-	   normalize
+	   transforms.DynamicNormalize()
 	)
 
 	transform_test = transforms.Compose(
 	   transforms.CenterCrop(tuple(config['dataset']['crop'])),
 	   transforms.ToTensor(),
-	   normalize
+	   transforms.DynamicNormalize()
 	)
 
 	if args.resume:

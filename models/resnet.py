@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torchvision.models.utils import load_state_dict_from_url
 from utils import LSEPool2d
+from utils.utils import reduce_weight_bias
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152', 'resnext50_32x4d', 'resnext101_32x8d',
@@ -125,7 +126,7 @@ class ResNet(nn.Module):
 
     def __init__(self, block, layers, num_classes=1000, zero_init_residual=False,
                  groups=1, width_per_group=64, replace_stride_with_dilation=None,
-                 norm_layer=None, last_pool = 'lse', lse_pool_controller = 10):
+                 norm_layer=None, last_pool = 'lse', lse_pool_controller = 10, one_channel = True):
         super(ResNet, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -142,7 +143,12 @@ class ResNet(nn.Module):
                              "or a 3-element tuple, got {}".format(replace_stride_with_dilation))
         self.groups = groups
         self.base_width = width_per_group
-        self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
+
+        num_channel = 3
+        if one_channel:
+            num_channel = 1
+
+        self.conv1 = nn.Conv2d(num_channel, self.inplanes, kernel_size=7, stride=2, padding=3,
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
         self.controllerelu = nn.ReLU(inplace=True)
@@ -231,21 +237,26 @@ class ResNet(nn.Module):
         return self._forward_impl(x)
 
 
-def ResNet50(pretrained = True, num_classes = 14, last_pool = 'lse', lse_pool_controller = 10, group_norm = False, **kwargs):
+def ResNet50(pretrained = True, num_classes = 14, one_channel = True, last_pool = 'lse', lse_pool_controller = 10, group_norm = False, **kwargs):
 
     if group_norm:
         norm_layer = lambda x: nn.GroupNorm(32, x)
     else:
         norm_layer = None
 
-    model = ResNet(block = Bottleneck, layers = [3, 4, 6, 3], num_classes = num_classes,
+    model = ResNet(block = Bottleneck, layers = [3, 4, 6, 3], num_classes = num_classes, one_channel = one_channel,
                     last_pool = last_pool, lse_pool_controller = lse_pool_controller, norm_layer = norm_layer, **kwargs)
 
     if pretrained:
         print(" Loading state dict from", model_urls['resnet50'])
         # Pretrained ResNet base
         loaded_state_dict = load_state_dict_from_url(model_urls['resnet50'], progress = True)
-        del loaded_state_dict['fc.weight'], loaded_state_dict['fc.bias']
+
+        loaded_state_dict['fc.weight'], loaded_state_dict['fc.bias'] = reduce_weight_bias(loaded_state_dict['fc.weight'].data, loaded_state_dict['fc.bias'].data, num_classes)
+
+        if one_channel:
+            # loaded_state_dict['conv1.weight'] = loaded_state_dict['conv1.weight'].mean(axis=1, keepdim = True)
+            loaded_state_dict['conv1.weight'] = (loaded_state_dict['conv1.weight'] ** 2).sum(axis = 1, keepdim=True).sqrt()
 
         model_state_dict = model.state_dict()
 

@@ -5,8 +5,10 @@ import shutil
 import numpy as np
 from PIL import Image, ImageDraw
 
+from scipy import signal
 from sklearn.metrics import roc_auc_score, roc_curve, precision_recall_curve
 from skimage.measure import label
+from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 
 import torch
@@ -163,8 +165,8 @@ def drawImage(images, target, scores, images_cropped = None, heatmaps = None, co
 	bz, c, h, w = images.shape # batch_size, channel, height, width
 
 	unnormalize = UnNormalize(
-		mean=[0.485, 0.456, 0.406],
-		std=[0.229, 0.224, 0.225]
+		mean=[0.4979839647692935],
+		std=[0.22962109349599796]
 	)
 	img = torch.empty(0, dtype = images.dtype)
 	img_scores = torch.empty(0, dtype = images.dtype)
@@ -196,3 +198,13 @@ def write_csv(filename, data, mode = 'a'):
 	with open(filename, mode = mode, newline = '') as file: 
 		writer = csv.writer(file)
 		writer.writerow(data)
+
+def reduce_weight_bias(weight, bias, num_classes = 14):
+    weight_np = weight.numpy()
+    bias_np = bias.numpy()
+    
+    pca = PCA(n_components=num_classes)
+    pca.fit(weight_np)
+    weight_np = pca.components_
+    bias_np = signal.resample(bias_np, num_classes)
+    return torch.from_numpy(weight_np), torch.from_numpy(bias_np)

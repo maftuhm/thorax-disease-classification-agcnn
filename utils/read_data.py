@@ -21,7 +21,7 @@ class ChestXrayDataSet(Dataset):
         array_dir = os.path.join(data_dir, 'npy')
         os.makedirs(array_dir, exist_ok=True)
 
-        filename        = 'my_array_' + split + '_images_base_on_image_split'
+        filename        = 'my_array_' + split + '_images_base_on_image_split_gray'
         filename_list   = 'my_' + split + '_list_base_on_image_split'
 
         array_file      = os.path.join(array_dir, filename + '.npy')
@@ -81,8 +81,9 @@ class ChestXrayDataSet(Dataset):
                 items = line.split()
                 image_name= items[0]
                 image_dir = os.path.join(data_dir, 'images', image_name)
-                image = cv2.imread(image_dir)
-                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                image = cv2.imread(image_dir, cv2.IMREAD_GRAYSCALE)
+                image = np.expand_dims(image, 2)
+                # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
                 if transform is not None:
                     image = transform(image)
