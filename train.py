@@ -411,7 +411,9 @@ def main():
 				save_dict_best_auroc = torch.load(path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_auroc.pth'))
 
 				save_dict = torch.load(checkpoint)
+				Model = Model.cpu()
 				Model.load_state_dict(save_dict['net'])
+				Model = Model.to(device)
 				optimizer.load_state_dict(save_dict['optim'])
 				lr_scheduler.load_state_dict(save_dict['lr_scheduler'])
 				start_epoch = save_dict['epoch']
@@ -455,7 +457,7 @@ def main():
 				shutil.copyfile(save_name, copy_name)
 				print(" Best model based on loss is saved: {}".format(copy_name))
 
-			print(" Training epoch time: {}".format(datetime.now() - start_time_epoch))
+			print(" Training epoch time: {}\n".format(datetime.now() - start_time_epoch))
 
 		val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion[2].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
 		del Model, TestModel, train_dataset, train_loader, val_dataset, val_loader, test_dataset, test_loader, criterion, optimizer

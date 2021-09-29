@@ -166,7 +166,13 @@ class ToTensor(CustomTransform):
         self.dtype=dtype
 
     def __call__(self, img):
-        img = img.transpose(2, 0, 1)
+        if img.ndim == 3:
+            img = img.transpose(2, 0, 1)
+        elif img.ndim == 2:
+            img = np.expand_dims(img, axis=0)
+        else:
+            raise Exception("Dimension is not valid")
+
         return torch.from_numpy(img).type(self.dtype) / 255.
 
 class Normalize(CustomTransform):

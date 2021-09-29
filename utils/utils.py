@@ -186,8 +186,14 @@ def drawImage(images, target, scores, images_cropped = None, heatmaps = None, co
 			img_crop = torch.cat((img_crop, unnormalize(images_cropped[i]).unsqueeze(0)), 0)
 		else:
 			img = torch.cat((img, unnormalize(images[i]).unsqueeze(0)), 0)
-	
+
+	if img.shape[1] == 1:
+		img = img.repeat(1, 3, 1, 1)
+
 	if images_cropped is not None:
+		if img_crop.shape[1] == 1:
+			img_crop = img_crop.repeat(1, 3, 1, 1)
+
 		new_img = torch.cat((img, img_heatmap, img_crop, img_scores), 0)
 	else:
 		new_img = torch.cat((img, img_scores), 0)

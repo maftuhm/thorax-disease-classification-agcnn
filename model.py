@@ -32,7 +32,7 @@ class ResAttCheXNet(nn.Module):
         print(" Pretrained model \t:", pretrained)
         if last_pool == 'lse':
             print(" lse pooling controller :", lse_pool_controller)
-        print(" Group normalization \t:", group_norm)
+        # print(" Group normalization \t:", group_norm)
 
     def forward(self, image):
         out, features, pool = self.backbone(image)

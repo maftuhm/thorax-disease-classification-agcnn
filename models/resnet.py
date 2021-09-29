@@ -252,11 +252,13 @@ def ResNet50(pretrained = True, num_classes = 14, one_channel = True, last_pool 
         # Pretrained ResNet base
         loaded_state_dict = load_state_dict_from_url(model_urls['resnet50'], progress = True)
 
-        loaded_state_dict['fc.weight'], loaded_state_dict['fc.bias'] = reduce_weight_bias(loaded_state_dict['fc.weight'].data, loaded_state_dict['fc.bias'].data, num_classes)
+        del loaded_state_dict['fc.weight'], loaded_state_dict['fc.bias']
+
+        # loaded_state_dict['fc.weight'], loaded_state_dict['fc.bias'] = reduce_weight_bias(loaded_state_dict['fc.weight'].data, loaded_state_dict['fc.bias'].data, num_classes)
 
         if one_channel:
-            # loaded_state_dict['conv1.weight'] = loaded_state_dict['conv1.weight'].mean(axis=1, keepdim = True)
-            loaded_state_dict['conv1.weight'] = (loaded_state_dict['conv1.weight'] ** 2).sum(axis = 1, keepdim=True).sqrt()
+            loaded_state_dict['conv1.weight'] = loaded_state_dict['conv1.weight'].mean(axis=1, keepdim = True).data
+            # loaded_state_dict['conv1.weight'] = (loaded_state_dict['conv1.weight'] ** 2).sum(axis = 1, keepdim=True).sqrt().data
 
         model_state_dict = model.state_dict()
 
