@@ -60,7 +60,7 @@ class ChestXrayDataSet(Dataset):
             image and its labels
         """
         image = np.ascontiguousarray(np.asarray(self.images[index], dtype=np.float32))
-        # image = np.expand_dims(cv2.cvtColor(image, cv2.COLOR_RGB2GRAY), axis=2)
+        image = np.expand_dims(image, 2)
         label = self.labels[index]
         if self.transform is not None:
             image = self.transform(image)

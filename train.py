@@ -30,6 +30,13 @@ def parse_args():
 	args = parser.parse_args()
 	return args
 
+def memory_usage(info = ""):
+	print("\n ON " + info)
+	print(" memory_allocated:", torch.cuda.memory_allocated() / 1024**2)
+	print(" max_memory_allocated:", torch.cuda.max_memory_allocated() / 1024**2)
+	print(" memory_reserved:", torch.cuda.memory_reserved() / 1024**2)
+	print(" max_memory_reserved:", torch.cuda.max_memory_reserved() / 1024**2)
+
 args = parse_args()
 
 # Load config json file
@@ -284,7 +291,7 @@ def main():
 
 	transform_init = transforms.Resize(tuple(config['dataset']['resize']))
 	transform_train = transforms.Compose(
-	   transforms.RandomResizedCrop(tuple(config['dataset']['crop']), (0.5, 1.0)),
+	   transforms.RandomResizedCrop(tuple(config['dataset']['crop']), (0.25, 1.0)),
 	   transforms.RandomHorizontalFlip(),
 	   transforms.ToTensor(),
 	   transforms.DynamicNormalize()
@@ -367,10 +374,12 @@ def main():
 			}
 			# TestModel['attention'].eval()
 			# for key in TestModel: TestModel[key].eval()
+			del save_dict_global
+			torch.cuda.empty_cache()
 
 		if branch_name == 'fusion':
-			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_loss' + '.pth'))
-			save_dict_local = torch.load(os.path.join(exp_dir_num, args.exp_num + '_local_best_loss' + '.pth'))
+			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_loss' + '.pth'), map_location='cpu')
+			save_dict_local = torch.load(os.path.join(exp_dir_num, args.exp_num + '_local_best_loss' + '.pth'), map_location='cpu')
 
 			GlobalModel.load_state_dict(save_dict_global['net'])
 			LocalModel.load_state_dict(save_dict_local['net'])
@@ -389,6 +398,8 @@ def main():
 			}
 			# TestModel['attention'].eval()
 			# for key in TestModel: TestModel[key].eval()
+			del save_dict_global, save_dict_local
+			torch.cuda.empty_cache()
 
 		if 'SGD' in config['optimizer']:
 			optimizer = optim.SGD(Model.parameters(), **config['optimizer']['SGD'])
@@ -403,15 +414,10 @@ def main():
 		if args.resume:
 
 			checkpoint = path.join(exp_dir_num, args.exp_num + '_' + branch_name + '.pth')
-			checkpoint_best_auroc = path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_auroc.pth')
-			checkpoint_best_loss = path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_loss.pth')
 
 			if path.isfile(checkpoint):
-				save_dict_best_loss = torch.load(path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_loss.pth'))
-				save_dict_best_auroc = torch.load(path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_auroc.pth'))
 
 				save_dict = torch.load(checkpoint)
-				Model = Model.cpu()
 				Model.load_state_dict(save_dict['net'])
 				Model = Model.to(device)
 				optimizer.load_state_dict(save_dict['optim'])
@@ -419,17 +425,24 @@ def main():
 				start_epoch = save_dict['epoch']
 				print(" Loaded " + branch_name + " branch model checkpoint from epoch " + str(start_epoch))
 				start_epoch += 1
+
+				del save_dict
+				torch.cuda.empty_cache()
 			else:
 				raise Exception("checkpoint model does not exist")
 
+			checkpoint_best_auroc = path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_auroc.pth')
+			checkpoint_best_loss = path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_loss.pth')
+
 			if path.isfile(checkpoint_best_auroc) and path.isfile(checkpoint_best_loss):
-				save_dict_best_loss = torch.load(checkpoint_best_loss)
-				save_dict_best_auroc = torch.load(checkpoint_best_auroc)
+				save_dict_best_loss = torch.load(checkpoint_best_loss, map_location='cpu')
+				save_dict_best_auroc = torch.load(checkpoint_best_auroc, map_location='cpu')
 				BEST_LOSS[branch_name] = save_dict_best_loss.get('loss', 1000.)
 				BEST_AUROCs[branch_name] = save_dict_best_auroc.get('auroc', 0.)
 				print(" latest best loss:", BEST_LOSS[branch_name])
 				print(" latest best auroc:", BEST_AUROCs[branch_name])
 				del save_dict_best_loss, save_dict_best_auroc
+				torch.cuda.empty_cache()
 
 		else:
 			start_epoch = 0
@@ -468,5 +481,4 @@ def main():
 		print(" Training time {} branch: {}".format(branch_name, datetime.now() - start_time_train))
 
 if __name__ == "__main__":
-	torch.cuda.empty_cache()
 	main()

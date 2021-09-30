@@ -72,21 +72,20 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 @torch.no_grad()
 def main():
 	# ================= TRANSFORMS ================= #
-	normalize = transforms.Normalize(
-	   mean=[0.485, 0.456, 0.406],
-	   std=[0.229, 0.224, 0.225]
-	)
-
+	# normalize = transforms.Normalize(
+	#    mean=[0.485, 0.456, 0.406],
+	#    std=[0.229, 0.224, 0.225]
+	# )
+	transform_init = transforms.Resize(tuple(config['dataset']['resize']))
 	transform_test = transforms.Compose(
-	   transforms.Resize(tuple(config['dataset']['resize'])),
 	   transforms.CenterCrop(tuple(config['dataset']['crop'])),
 	   transforms.ToTensor(),
-	   normalize,
+	   transforms.DynamicNormalize()
 	)
 
 	# ================= LOAD DATASET ================= #
 
-	test_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = NUM_CLASSES, transform = transform_test)
+	test_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
 	test_loader = DataLoader(dataset = test_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = False, num_workers = 0, pin_memory = True)
 
 	# ================= MODELS ================= #
