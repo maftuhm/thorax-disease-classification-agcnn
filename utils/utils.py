@@ -214,3 +214,7 @@ def reduce_weight_bias(weight, bias, num_classes = 14):
     weight_np = pca.components_
     bias_np = signal.resample(bias_np, num_classes)
     return torch.from_numpy(weight_np), torch.from_numpy(bias_np)
+
+def get_weight_wbce_loss(labels):
+	count_labels = torch.tensor(labels, dtype=torch.float32).sum(axis=0)
+	return (labels.shape[0] / count_labels) - 1

@@ -342,7 +342,11 @@ def main():
 		if config['loss'] == 'BCELoss':
 			criterion = nn.BCELoss()
 		elif config['loss'] == 'WeightedBCELoss':
-			criterion = WeightedBCELoss(PosNegWeightIsDynamic = True)
+			criterion = dict(
+				train = WeightedBCELoss(pos_weight = get_weight_wbce_loss(train_dataset.labels)),
+				val = WeightedBCELoss(pos_weight = get_weight_wbce_loss(val_dataset.labels)),
+				test = WeightedBCELoss(pos_weight = get_weight_wbce_loss(test_dataset.labels))
+			)
 		elif config['loss'] == 'BCEWithLogitsLoss':
 			count_train_labels = torch.tensor(train_dataset.labels, dtype=torch.float32).sum(axis=0)
 			weight_train = (len(train_dataset) / count_train_labels) - 1
@@ -350,7 +354,11 @@ def main():
 			weight_val = (len(val_dataset) / count_val_labels) - 1
 			count_test_labels = torch.tensor(test_dataset.labels, dtype=torch.float32).sum(axis=0)
 			weight_test = (len(test_dataset) / count_test_labels) - 1
-			criterion = (nn.BCEWithLogitsLoss(pos_weight=weight_train), nn.BCEWithLogitsLoss(pos_weight=weight_val), nn.BCEWithLogitsLoss(pos_weight=weight_test))
+			criterion = dict(
+				train = nn.BCEWithLogitsLoss(pos_weight=weight_train),
+				val = nn.BCEWithLogitsLoss(pos_weight=weight_val),
+				test = nn.BCEWithLogitsLoss(pos_weight=weight_test)
+			)
 		else:
 			raise Exception("loss function must be BCELoss or WeightedBCELoss")
 
@@ -450,9 +458,9 @@ def main():
 		for epoch in range(start_epoch, config['NUM_EPOCH']):
 			start_time_epoch = datetime.now()
 
-			train_one_epoch(epoch, branch_name, Model, optimizer, lr_scheduler, train_loader, criterion[0].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
+			train_one_epoch(epoch, branch_name, Model, optimizer, lr_scheduler, train_loader, criterion['train'].to(device) if isinstance(criterion, dict) else criterion, TestModel)
 			
-			val_auroc, val_loss = val_one_epoch(epoch, branch_name, Model, val_loader, criterion[1].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
+			val_auroc, val_loss = val_one_epoch(epoch, branch_name, Model, val_loader, criterion['val'].to(device) if isinstance(criterion, dict) else criterion, TestModel)
 			lr_scheduler.step()
 
 			save_model(exp_dir_num, epoch, val_auroc, val_loss, Model, optimizer, lr_scheduler, branch_name)
@@ -472,7 +480,7 @@ def main():
 
 			print(" Training epoch time: {}\n".format(datetime.now() - start_time_epoch))
 
-		val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion[2].to(device) if isinstance(criterion, tuple) else criterion, TestModel)
+		val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion['test'].to(device) if isinstance(criterion, dict) else criterion, TestModel)
 		del Model, TestModel, train_dataset, train_loader, val_dataset, val_loader, test_dataset, test_loader, criterion, optimizer
 		torch.cuda.empty_cache()
 
