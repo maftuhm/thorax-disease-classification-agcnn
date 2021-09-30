@@ -279,3 +279,35 @@ def ResNet50(pretrained = True, num_classes = 14, one_channel = True, last_pool 
         print(" State dict is loaded")
 
     return model
+
+def ResNet101(pretrained = True, num_classes = 14, one_channel = True, last_pool = 'lse', lse_pool_controller = 10, group_norm = False, **kwargs):
+
+    if group_norm:
+        norm_layer = lambda x: nn.GroupNorm(32, x)
+    else:
+        norm_layer = None
+
+    model = ResNet(block = Bottleneck, layers = [3, 4, 23, 3], num_classes = num_classes, one_channel = one_channel,
+                    last_pool = last_pool, lse_pool_controller = lse_pool_controller, norm_layer = norm_layer, **kwargs)
+
+    if pretrained:
+        print(" Loading state dict from", model_urls['resnet101'])
+        # Pretrained ResNet base
+        loaded_state_dict = load_state_dict_from_url(model_urls['resnet101'], progress = True)
+
+        del loaded_state_dict['fc.weight'], loaded_state_dict['fc.bias']
+
+        if one_channel:
+            loaded_state_dict['conv1.weight'] = loaded_state_dict['conv1.weight'].mean(axis=1, keepdim = True).data
+
+        model_state_dict = model.state_dict()
+
+        for key in list(model_state_dict.keys()):
+            if key in list(loaded_state_dict.keys()):
+                model_state_dict[key] = loaded_state_dict[key]
+
+        model.load_state_dict(model_state_dict)
+        del loaded_state_dict, model_state_dict
+        print(" State dict is loaded")
+
+    return model

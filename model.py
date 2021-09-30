@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models import ResNet50, DenseNet121
+from models import ResNet50, ResNet101, DenseNet121
 
 class ResAttCheXNet(nn.Module):
     def __init__(self, last_pool = 'lse', lse_pool_controller = 5, 
@@ -18,6 +18,13 @@ class ResAttCheXNet(nn.Module):
                                     group_norm = group_norm,
                                     **kwargs)
 
+        elif backbone == 'resnet101':
+            self.backbone = DenseNet121(pretrained = pretrained,
+                                        num_classes = num_classes,
+                                        last_pool = last_pool,
+                                        lse_pool_controller = lse_pool_controller,
+                                        **kwargs)
+
         elif backbone == 'densenet121':
             self.backbone = DenseNet121(pretrained = pretrained,
                                         num_classes = num_classes,
@@ -25,7 +32,7 @@ class ResAttCheXNet(nn.Module):
                                         lse_pool_controller = lse_pool_controller,
                                         **kwargs)
         else:
-            raise Exception("backbone must be resnet50 or densenet121")
+            raise Exception("backbone must be resnet50, resnet101 or densenet121")
 
         print(" Backbone \t\t:", backbone)
         print(" Last pooling layer\t:", last_pool)

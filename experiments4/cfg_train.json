@@ -40,5 +40,19 @@
 			"local" : 10,
 			"fusion" : 4
 		}
+	},
+	"agcnn2" : {
+		"net" : {
+			"backbone" : "resnet101",
+			"last_pool" : "max"
+		},
+		"branch" : ["global"],
+		"optimizer" : "SGD",
+		"loss" : "BCELoss",
+		"max_batch" : {
+			"global" : 20,
+			"local" : 10,
+			"fusion" : 4
+		}
 	}
 }
