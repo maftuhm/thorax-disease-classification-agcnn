@@ -36,9 +36,7 @@
 		"optimizer" : "SGD",
 		"loss" : "BCELoss",
 		"max_batch" : {
-			"global" : 20,
-			"local" : 10,
-			"fusion" : 4
+			"global" : 20
 		}
 	},
 	"agcnn2" : {
@@ -50,9 +48,7 @@
 		"optimizer" : "SGD",
 		"loss" : "BCELoss",
 		"max_batch" : {
-			"global" : 20,
-			"local" : 10,
-			"fusion" : 4
+			"global" : 12
 		}
 	}
 }

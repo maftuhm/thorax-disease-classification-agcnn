@@ -19,7 +19,7 @@ class ResAttCheXNet(nn.Module):
                                     **kwargs)
 
         elif backbone == 'resnet101':
-            self.backbone = DenseNet121(pretrained = pretrained,
+            self.backbone = ResNet101(pretrained = pretrained,
                                         num_classes = num_classes,
                                         last_pool = last_pool,
                                         lse_pool_controller = lse_pool_controller,
