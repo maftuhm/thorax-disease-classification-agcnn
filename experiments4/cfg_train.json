@@ -28,13 +28,14 @@
 		"loss" : "WeightedBCELoss"
 	},
 	"agcnn" : {
+		"NUM_EPOCH" : 100,
 		"net" : {
 			"backbone" : "resnet50",
 			"last_pool" : "max"
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",
-		"loss" : "BCELoss",
+		"loss" : "WeightedBCELoss",
 		"max_batch" : {
 			"global" : 20
 		}

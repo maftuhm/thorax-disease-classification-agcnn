@@ -130,8 +130,8 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 			del output_global, output_local
 
-		images = images.to(device)
-		targets = targets.to(device)
+		images = images.to(device, non_blocking=True)
+		targets = targets.to(device, non_blocking=True)
 
 		# be careful add last layer with sigmoid if using bceloss or weighted bce loss
 		# and remove sigimoid(output) here
@@ -216,8 +216,8 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 
 			del output_global, output_local
 
-		images = images.to(device)
-		targets = targets.to(device)
+		images = images.to(device, non_blocking=True)
+		targets = targets.to(device, non_blocking=True)
 		gt = torch.cat((gt, targets.detach().cpu()), 0)
 
 		# be careful add last layer with sigmoid if using bceloss or weighted bce loss
@@ -331,22 +331,23 @@ def main():
 
 		# ================= LOAD DATASET ================= #
 		train_dataset = ChestXrayDataSet(DATA_DIR, 'train', num_classes = NUM_CLASSES, transform = transform_train, init_transform=transform_init)
-		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 0, pin_memory = True, drop_last=True)
+		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 5, pin_memory = True, drop_last=True)
 
 		val_dataset = ChestXrayDataSet(DATA_DIR, 'val', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, num_workers = 0, pin_memory = True)
+		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, num_workers = 5, pin_memory = True)
 
 		test_dataset = ChestXrayDataSet(DATA_DIR, 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, num_workers = 0, pin_memory = True)
+		test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, num_workers = 5, pin_memory = True)
 
 		if config['loss'] == 'BCELoss':
 			criterion = nn.BCELoss()
 		elif config['loss'] == 'WeightedBCELoss':
-			criterion = dict(
-				train = WeightedBCELoss(weight = torch.tensor(0.1), pos_weight = get_weight_wbce_loss(train_dataset.labels)),
-				val = WeightedBCELoss(weight = torch.tensor(0.1), pos_weight = get_weight_wbce_loss(val_dataset.labels)),
-				test = WeightedBCELoss(weight = torch.tensor(0.1), pos_weight = get_weight_wbce_loss(test_dataset.labels))
-			)
+			criterion = WeightedBCELoss(PosNegWeightIsDynamic = True)
+			# criterion = dict(
+			# 	train = WeightedBCELoss(weight = torch.tensor(0.1), pos_weight = get_weight_wbce_loss(train_dataset.labels)),
+			# 	val = WeightedBCELoss(weight = torch.tensor(0.1), pos_weight = get_weight_wbce_loss(val_dataset.labels)),
+			# 	test = WeightedBCELoss(weight = torch.tensor(0.1), pos_weight = get_weight_wbce_loss(test_dataset.labels))
+			# )
 		elif config['loss'] == 'BCEWithLogitsLoss':
 			count_train_labels = torch.tensor(train_dataset.labels, dtype=torch.float32).sum(axis=0)
 			weight_train = (len(train_dataset) / count_train_labels) - 1

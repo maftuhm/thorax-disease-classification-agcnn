@@ -16,7 +16,7 @@ class ChestXrayDataSet(Dataset):
         self.transform = transform
         self.init_transform = init_transform
 
-        self.static_images_dir = 'images_' + str(transform_init).lower()
+        self.static_images_dir = 'images_' + str(init_transform).lower()
 
         if not os.path.exists(os.path.join(data_dir, self.static_images_dir)):
             print("Static Image is going to get generated into dir: {} ...".format(self.static_images_dir))
