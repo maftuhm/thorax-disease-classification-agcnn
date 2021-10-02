@@ -67,6 +67,12 @@ class Resize(CustomTransform):
             size = (size, size)
         self.size = size
 
+    def __repr__(self):
+        return self.__class__.__name__ + '(size={0})'.format(self.size)
+
+    def __str__(self):
+        return self.__class__.__name__ + '{}'.format(self.size[0] if isinstance(self.size, tuple) else self.size)
+
 class CenterCrop(torch.nn.Module):
     def __init__(self, size):
         if isinstance(size, int):
@@ -75,7 +81,7 @@ class CenterCrop(torch.nn.Module):
         
     @staticmethod
     def get_params(img, size):
-        height, width, _ = img.shape
+        height, width = img.shape[0], img.shape[1]
         
         crop_width = size[0] if size[0] < width else width
         crop_height = size[1] if size[1] < height else height
@@ -90,6 +96,10 @@ class CenterCrop(torch.nn.Module):
 
     def __repr__(self):
         return self.__class__.__name__ + '(size={0})'.format(self.size)
+
+    def __str__(self):
+        return self.__class__.__name__ + '{}'.format(self.size[0] if isinstance(self.size, tuple) else self.size)
+
 
 class RandomHorizontalFlip(CustomTransform):
     def __init__(self, prob=0.5):
@@ -118,7 +128,7 @@ class RandomResizedCrop(CustomTransform):
     
     @staticmethod
     def get_params(img, scale, ratio):
-        height, width, _ = img.shape
+        height, width = img.shape[0], img.shape[1]
         area = height * width
 
         log_ratio = np.log(ratio)

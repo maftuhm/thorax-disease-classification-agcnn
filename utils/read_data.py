@@ -1,96 +1,68 @@
 import os
+import json
 import cv2
 import torch
-import numpy as np
-import sharearray
 from tqdm import tqdm
 from torch.utils.data import Dataset
-from numpy.lib.format import open_memmap
 
 class ChestXrayDataSet(Dataset):
-    def __init__(self, data_dir, split, num_classes=14, transform=None, init_transform = None):
-        """
-        Args:
-            data_dir: path to image directory.
-            image_list_file: path to the file containing images
-                with corresponding labels.
-            transform: optional transform to be applied on a sample.
-        """
-        assert split in {'train', 'test', 'val', 'train_val'}
+    
+    def __init__(self, data_dir, image_set, num_classes=14, transform=None, init_transform = None):
 
-        array_dir = os.path.join(data_dir, 'npy')
-        os.makedirs(array_dir, exist_ok=True)
-
-        filename        = 'my_array_' + split + '_images_base_on_image_split_gray'
-        filename_list   = 'my_' + split + '_list_base_on_image_split'
-
-        array_file      = os.path.join(array_dir, filename + '.npy')
-        data_list       = os.path.join(data_dir, 'labels', filename_list + '.txt')
-
-        if os.path.isfile(array_file) is not True:
-            images = sharearray.cache(
-                filename,
-                lambda: self.create_data_array(data_dir, data_list, init_transform),
-                shm_path=array_dir,
-                prefix=''
-            )
-            images.flush()
-            del images
-
-        self.images = open_memmap(array_file, mode='r+')
-
-        labels = []
-        with open(data_list, "r") as file:
-            lines = file.readlines()
-            for line in lines:
-                items = line.split()
-                label = items[1:num_classes+1]
-                label = [int(i) for i in label]
-                labels.append(label)
-
-        self.labels = np.asarray(labels)
+        assert image_set in {'train', 'val', 'test'}, "image_set is not valid!"
+        self.data_dir_path = data_dir
+        self.image_set = image_set
+        self.num_classes = num_classes
         self.transform = transform
+        self.init_transform = init_transform
+
+        self.static_images_dir = 'images_' + str(transform_init).lower()
+
+        if not os.path.exists(os.path.join(data_dir, self.static_images_dir)):
+            print("Static Image is going to get generated into dir: {} ...".format(self.static_images_dir))
+            self.create_static_images()
+            print("Static Image is successfully generated into dir: {} ...".format(self.static_images_dir))
+
+        self.create_index()
+
+    def create_static_images(self):
+
+        os.makedirs(os.path.join(self.data_dir_path, self.static_images_dir))
+        
+        images_dir_path = os.path.join(self.data_dir_path, 'images')
+        images_list = os.listdir(images_dir_path)
+
+        progressbar = tqdm(range(len(images_list)))
+        for name in images_list:
+            image = cv2.imread(os.path.join(images_dir_path, name), cv2.IMREAD_GRAYSCALE)
+
+            if self.init_transform is not None:
+                image = self.init_transform(image)
+
+            progressbar.set_description("Generating {} image".format(name))
+            cv2.imwrite(os.path.join(self.data_dir_path, self.static_images_dir, name), image)
+            progressbar.update(1)
+        progressbar.close()
+    
+    def create_index(self):
+        self.images = []
+        self.labels = []
+
+        json_raw_files = os.path.join(self.data_dir_path, 'labels', self.image_set + '_list.json')
+        with open(json_raw_files, "r") as file:
+            for data in file:
+                data = json.loads(data)
+                self.images.append(os.path.join(self.data_dir_path, self.static_images_dir, data['index']))
+                self.labels.append(data['label'][:self.num_classes])
 
     def __getitem__(self, index):
-        """
-        Args:
-            index: the index of item
-
-        Returns:
-            image and its labels
-        """
-        image = np.ascontiguousarray(np.asarray(self.images[index], dtype=np.float32))
-        image = np.expand_dims(image, 2)
+        image = cv2.imread(self.images[index], cv2.IMREAD_GRAYSCALE)
         label = self.labels[index]
+
         if self.transform is not None:
             image = self.transform(image)
+
         return image, torch.FloatTensor(label)
 
     def __len__(self):
         return len(self.labels)
-
-    def create_data_array(self, data_dir, data_list, transform):
-
-        images = []
-
-        with open(data_list, "r") as file:
-
-            lines = file.readlines()
-            progressbar = tqdm(range(len(lines)))
-            for line in lines:
-                items = line.split()
-                image_name= items[0]
-                image_dir = os.path.join(data_dir, 'images', image_name)
-                image = cv2.imread(image_dir, cv2.IMREAD_GRAYSCALE)
-                image = np.expand_dims(image, 2)
-                # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-                if transform is not None:
-                    image = transform(image)
-
-                images.append(image)
-                progressbar.update(1)
-            progressbar.close()
-
-        return np.asarray(images)
-
