@@ -334,18 +334,18 @@ def main():
 		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 0, pin_memory = True, drop_last=True)
 
 		val_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'val', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 8, shuffle = False, num_workers = 0, pin_memory = True)
+		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, num_workers = 0, pin_memory = True)
 
 		test_dataset = ChestXrayDataSet(data_dir = DATA_DIR, split = 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 8, shuffle = False, num_workers = 0, pin_memory = True)
+		test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, num_workers = 0, pin_memory = True)
 
 		if config['loss'] == 'BCELoss':
 			criterion = nn.BCELoss()
 		elif config['loss'] == 'WeightedBCELoss':
 			criterion = dict(
-				train = WeightedBCELoss(pos_weight = get_weight_wbce_loss(train_dataset.labels)),
-				val = WeightedBCELoss(pos_weight = get_weight_wbce_loss(val_dataset.labels)),
-				test = WeightedBCELoss(pos_weight = get_weight_wbce_loss(test_dataset.labels))
+				train = WeightedBCELoss(weight = torch.tensor(0.1), pos_weight = get_weight_wbce_loss(train_dataset.labels)),
+				val = WeightedBCELoss(weight = torch.tensor(0.1), pos_weight = get_weight_wbce_loss(val_dataset.labels)),
+				test = WeightedBCELoss(weight = torch.tensor(0.1), pos_weight = get_weight_wbce_loss(test_dataset.labels))
 			)
 		elif config['loss'] == 'BCEWithLogitsLoss':
 			count_train_labels = torch.tensor(train_dataset.labels, dtype=torch.float32).sum(axis=0)
@@ -355,7 +355,7 @@ def main():
 			count_test_labels = torch.tensor(test_dataset.labels, dtype=torch.float32).sum(axis=0)
 			weight_test = (len(test_dataset) / count_test_labels) - 1
 			criterion = dict(
-				train = nn.BCEWithLogitsLoss(pos_weight=weight_train),
+				train = nn.BCEWithLogitsLoss(weigpos_weight=weight_train),
 				val = nn.BCEWithLogitsLoss(pos_weight=weight_val),
 				test = nn.BCEWithLogitsLoss(pos_weight=weight_test)
 			)

@@ -50,5 +50,17 @@
 		"max_batch" : {
 			"global" : 12
 		}
+	},
+	"agcnn3" : {
+		"net" : {
+			"backbone" : "resnet50",
+			"last_pool" : "max"
+		},
+		"branch" : ["global"],
+		"optimizer" : "SGD",
+		"loss" : "WeightedBCELoss",
+		"max_batch" : {
+			"global" : 20
+		}
 	}
 }

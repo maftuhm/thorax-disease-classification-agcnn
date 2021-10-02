@@ -189,7 +189,7 @@ class DynamicNormalize(CustomTransform):
         self.inplace = inplace
 
     def __call__(self, tensor):
-        return normalize_tv(tensor, tensor.mean(), tensor.std(), inplace = self.inplace)
+        return normalize_tv(tensor, tensor.mean(), tensor.std().clamp(min=1e-7), inplace = self.inplace)
 
 class UnNormalize(CustomTransform):
     def __init__(self, mean, std):
