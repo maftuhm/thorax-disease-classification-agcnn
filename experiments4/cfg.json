@@ -24,8 +24,17 @@
 		}
 	},
 	"lr_scheduler" : {
-		"step_size" : 20, 
-		"gamma" : 0.1
+		"StepLR" : {
+			"step_size" : 20, 
+			"gamma" : 0.1,
+			"verbose" : true
+		},
+		"ReduceLROnPlateau" : {
+			"mode" : "min", 
+			"patience" : 2,
+			"factor" : 0.1,
+			"verbose" : true
+		}
 	},
 	"max_batch" : {
 		"global" : 16,

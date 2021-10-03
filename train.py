@@ -60,6 +60,9 @@ if 'local' in exp_config['branch']:
 config['optimizer'] = {exp_config['optimizer'] : config['optimizer'][exp_config['optimizer']]}
 del exp_config['optimizer']
 
+config['lr_scheduler'] = {exp_config['lr_scheduler'] : config['lr_scheduler'][exp_config['lr_scheduler']]}
+del exp_config['lr_scheduler']
+
 config.update(exp_config)
 del exp_config, exp_configs
 
@@ -417,8 +420,12 @@ def main():
 		else:
 			raise Exception("optimizer must be SGD or Adam")
 
-		lr_scheduler = optim.lr_scheduler.StepLR(optimizer , **config['lr_scheduler'])
-		# lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=2, factor=0.1, verbose=True)
+		if 'StepLR' in config['lr_scheduler']:
+			lr_scheduler = optim.lr_scheduler.StepLR(optimizer , **config['lr_scheduler'])
+		elif 'ReduceLROnPlateau' in config['lr_scheduler']:
+			lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, **config['lr_scheduler'])
+		else:
+			raise Exception("lr_scheduler must be StepLR or ReduceLROnPlateau")
 
 		if args.resume:
 
@@ -462,7 +469,11 @@ def main():
 			train_one_epoch(epoch, branch_name, Model, optimizer, lr_scheduler, train_loader, criterion['train'].to(device) if isinstance(criterion, dict) else criterion, TestModel)
 			
 			val_auroc, val_loss = val_one_epoch(epoch, branch_name, Model, val_loader, criterion['val'].to(device) if isinstance(criterion, dict) else criterion, TestModel)
-			lr_scheduler.step()
+			
+			if isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+				lr_scheduler.step(val_loss)
+			else:
+				lr_scheduler.step()
 
 			save_model(exp_dir_num, epoch, val_auroc, val_loss, Model, optimizer, lr_scheduler, branch_name)
 
