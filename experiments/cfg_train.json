@@ -2,12 +2,12 @@
 	"chexnet" : {
 		"net" : {
 			"backbone" : "densenet121",
-			"last_pool" : "max"
+			"last_pool" : "avg"
 		},
 		"branch" : ["global"],
 		"optimizer" : "Adam",
-		"loss" : "BCELoss",
 		"lr_scheduler" : "ReduceLROnPlateau",
+		"loss" : "BCELoss",
 		"max_batch" : {
 			"global" : 10
 		}
@@ -20,43 +20,60 @@
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",
-		"loss" : "WeightedBCELoss"
+		"lr_scheduler" : "ReduceLROnPlateau",
+		"loss" : "WeightedBCELoss",
+		"max_batch" : {
+			"global" : 20
+		}
 	},
-	"agcnn" : {
-		"NUM_EPOCH" : 100,
+	"agcnn0" : {
 		"net" : {
 			"backbone" : "resnet50",
 			"last_pool" : "max"
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",
-		"loss" : "WeightedBCELoss",
+		"lr_scheduler" : "StepLR",
+		"loss" : "BCELoss",
 		"max_batch" : {
 			"global" : 20
+		}
+	},
+	"agcnn1" : {
+		"net" : {
+			"backbone" : "densenet121",
+			"last_pool" : "max"
+		},
+		"branch" : ["global"],
+		"optimizer" : "Adam",
+		"lr_scheduler" : "ReduceLROnPlateau",
+		"loss" : "BCELoss",
+		"max_batch" : {
+			"global" : 10
 		}
 	},
 	"agcnn2" : {
 		"net" : {
-			"backbone" : "resnet101",
+			"backbone" : "densenet121",
 			"last_pool" : "max"
 		},
 		"branch" : ["global"],
-		"optimizer" : "SGD",
-		"loss" : "BCELoss",
+		"optimizer" : "Adam",
+		"loss" : "WeightedBCELoss",
 		"max_batch" : {
-			"global" : 12
+			"global" : 10
 		}
 	},
 	"agcnn3" : {
 		"net" : {
-			"backbone" : "resnet50",
+			"backbone" : "densenet121",
 			"last_pool" : "max"
 		},
 		"branch" : ["global"],
-		"optimizer" : "SGD",
+		"optimizer" : "Adam",
 		"loss" : "WeightedBCELoss",
 		"max_batch" : {
-			"global" : 20
+			"global" : 10
 		}
 	}
 }

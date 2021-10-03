@@ -6,9 +6,9 @@
 		"crop" : [224, 224]
 	},
 	"batch_size" : {
-		"global" : 128,
-		"local" : 128,
-		"fusion" : 128
+		"global" : 120,
+		"local" : 120,
+		"fusion" : 120
 	},
 	"optimizer" : {
 		"SGD" : {
