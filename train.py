@@ -326,6 +326,7 @@ def main():
 
 	print(" Num classes \t\t:", NUM_CLASSES)
 	print(" Optimizer \t\t:", list(config['optimizer'].keys())[0])
+	print(" Lr Scheduler \t\t:", list(config['lr_scheduler'].keys())[0])
 	print(" Loss function \t\t:", config['loss'])
 	print()
 
@@ -337,10 +338,10 @@ def main():
 		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 5, pin_memory = True, drop_last=True)
 
 		val_dataset = ChestXrayDataSet(DATA_DIR, 'val', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, num_workers = 5, pin_memory = True)
+		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 8, shuffle = False, num_workers = 5, pin_memory = True)
 
 		test_dataset = ChestXrayDataSet(DATA_DIR, 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, num_workers = 5, pin_memory = True)
+		test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 8, shuffle = False, num_workers = 5, pin_memory = True)
 
 		if config['loss'] == 'BCELoss':
 			criterion = nn.BCELoss()
@@ -421,9 +422,9 @@ def main():
 			raise Exception("optimizer must be SGD or Adam")
 
 		if 'StepLR' in config['lr_scheduler']:
-			lr_scheduler = optim.lr_scheduler.StepLR(optimizer , **config['lr_scheduler'])
+			lr_scheduler = optim.lr_scheduler.StepLR(optimizer , **config['lr_scheduler']['StepLR'])
 		elif 'ReduceLROnPlateau' in config['lr_scheduler']:
-			lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, **config['lr_scheduler'])
+			lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, **config['lr_scheduler']['ReduceLROnPlateau'])
 		else:
 			raise Exception("lr_scheduler must be StepLR or ReduceLROnPlateau")
 

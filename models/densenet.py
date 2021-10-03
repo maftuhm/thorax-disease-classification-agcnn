@@ -142,13 +142,17 @@ class DenseNet(nn.Module):
 
     def __init__(self, growth_rate=32, block_config=(6, 12, 24, 16),
                  num_init_features=64, bn_size=4, drop_rate=0, num_classes=1000, memory_efficient=False,
-                 last_pool = 'lse', lse_pool_controller = 10):
+                 last_pool = 'lse', lse_pool_controller = 10, one_channel = True):
 
         super(DenseNet, self).__init__()
 
+        num_channel = 3
+        if one_channel:
+            num_channel = 1
+
         # First convolution
         self.features = nn.Sequential(OrderedDict([
-            ('conv0', nn.Conv2d(3, num_init_features, kernel_size=7, stride=2,
+            ('conv0', nn.Conv2d(num_channel, num_init_features, kernel_size=7, stride=2,
                                 padding=3, bias=False)),
             ('norm0', nn.BatchNorm2d(num_init_features)),
             ('relu0', nn.ReLU(inplace=True)),
@@ -212,9 +216,9 @@ class DenseNet(nn.Module):
         out = torch.sigmoid(out)
         return out, features, flatten_pool
 
-def DenseNet121(pretrained = True, num_classes = 14, last_pool = 'lse', lse_pool_controller = 10, **kwargs):
+def DenseNet121(pretrained = True, num_classes = 14, one_channel = True, last_pool = 'lse', lse_pool_controller = 10, **kwargs):
     model = DenseNet(growth_rate = 32, block_config = (6, 12, 24, 16),
-                    num_init_features = 64, num_classes = num_classes,
+                    num_init_features = 64, num_classes = num_classes, one_channel = one_channel,
                     last_pool = last_pool, lse_pool_controller = lse_pool_controller, **kwargs)
     if pretrained:
         print(" Loading state dict from", model_urls['densenet121'])
@@ -226,6 +230,10 @@ def DenseNet121(pretrained = True, num_classes = 14, last_pool = 'lse', lse_pool
             r'^(.*denselayer\d+\.(?:norm|relu|conv))\.((?:[12])\.(?:weight|bias|running_mean|running_var))$')
 
         state_dict = load_state_dict_from_url(model_urls['densenet121'], progress=True)
+
+        if one_channel:
+            state_dict['features.conv0.weight'] = state_dict['features.conv0.weight'].mean(axis=1, keepdim = True)
+
         for key in list(state_dict.keys()):
             res = pattern.match(key)
             if res:
@@ -237,10 +245,11 @@ def DenseNet121(pretrained = True, num_classes = 14, last_pool = 'lse', lse_pool
         # step_fold = (1000 // model.state_dict()['classifier.weight'].size(0)) + 1
         # state_dict['classifier.weight'] = state_dict['classifier.weight'].unfold(0, 1, step_fold).flatten(1)  # (num_classes, 1024)
         # state_dict['classifier.bias'] = state_dict['classifier.bias'].unfold(0, 1, step_fold).flatten()  # (num_classes)
-        state_dict['classifier.weight'] = model.state_dict()['classifier.weight'].data
-        state_dict['classifier.bias'] = model.state_dict()['classifier.bias'].data
+        state_dict['classifier.weight'] = model.state_dict()['classifier.weight']
+        state_dict['classifier.bias'] = model.state_dict()['classifier.bias']
 
         model.load_state_dict(state_dict)
+        del state_dict
         print(" State dict is loaded")
 
     return model

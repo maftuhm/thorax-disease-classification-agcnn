@@ -7,14 +7,9 @@
 		"branch" : ["global"],
 		"optimizer" : "Adam",
 		"loss" : "BCELoss",
-		"lr_scheduler" : {
-			"step_size" : 10, 
-			"gamma" : 0.1
-		},
+		"lr_scheduler" : "ReduceLROnPlateau",
 		"max_batch" : {
-			"global" : 10,
-			"local" : 10,
-			"fusion" : 4
+			"global" : 10
 		}
 	},
 	"chestxray14" : {
