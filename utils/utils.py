@@ -164,10 +164,9 @@ def draw_label_score(target, scores, size = (224, 224)):
 def drawImage(images, target, scores, images_cropped = None, heatmaps = None, coordinates = None):
 	bz, c, h, w = images.shape # batch_size, channel, height, width
 
-	unnormalize = UnNormalize(
-		mean=[0.4979839647692935],
-		std=[0.22962109349599796]
-	)
+	# unnormalize = UnNormalize(mean=[0.4979839647692935], std=[0.22962109349599796]) # ori
+	unnormalize = UnNormalize(mean=[0.49886124425113754], std=[0.22925289787072856]) # resize
+
 	img = torch.empty(0, dtype = images.dtype)
 	img_scores = torch.empty(0, dtype = images.dtype)
 

@@ -142,17 +142,17 @@ class DenseNet(nn.Module):
 
     def __init__(self, growth_rate=32, block_config=(6, 12, 24, 16),
                  num_init_features=64, bn_size=4, drop_rate=0, num_classes=1000, memory_efficient=False,
-                 last_pool = 'lse', lse_pool_controller = 10, one_channel = True):
+                 last_pool = 'lse', lse_pool_controller = 10, is_grayscale = True):
 
         super(DenseNet, self).__init__()
 
-        num_channel = 3
-        if one_channel:
-            num_channel = 1
+        in_channel = 3
+        if is_grayscale:
+            in_channel = 1
 
         # First convolution
         self.features = nn.Sequential(OrderedDict([
-            ('conv0', nn.Conv2d(num_channel, num_init_features, kernel_size=7, stride=2,
+            ('conv0', nn.Conv2d(in_channel, num_init_features, kernel_size=7, stride=2,
                                 padding=3, bias=False)),
             ('norm0', nn.BatchNorm2d(num_init_features)),
             ('relu0', nn.ReLU(inplace=True)),
@@ -216,9 +216,9 @@ class DenseNet(nn.Module):
         out = torch.sigmoid(out)
         return out, features, flatten_pool
 
-def DenseNet121(pretrained = True, num_classes = 14, one_channel = True, last_pool = 'lse', lse_pool_controller = 10, **kwargs):
+def DenseNet121(pretrained = True, num_classes = 14, is_grayscale = True, last_pool = 'lse', lse_pool_controller = 10, **kwargs):
     model = DenseNet(growth_rate = 32, block_config = (6, 12, 24, 16),
-                    num_init_features = 64, num_classes = num_classes, one_channel = one_channel,
+                    num_init_features = 64, num_classes = num_classes, is_grayscale = is_grayscale,
                     last_pool = last_pool, lse_pool_controller = lse_pool_controller, **kwargs)
     if pretrained:
         print(" Loading state dict from", model_urls['densenet121'])
@@ -231,7 +231,7 @@ def DenseNet121(pretrained = True, num_classes = 14, one_channel = True, last_po
 
         state_dict = load_state_dict_from_url(model_urls['densenet121'], progress=True)
 
-        if one_channel:
+        if is_grayscale:
             state_dict['features.conv0.weight'] = state_dict['features.conv0.weight'].mean(axis=1, keepdim = True)
 
         for key in list(state_dict.keys()):

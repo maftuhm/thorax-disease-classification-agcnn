@@ -12,6 +12,32 @@
 			"global" : 10
 		}
 	},
+	"chexnet1" : {
+		"net" : {
+			"backbone" : "densenet121",
+			"last_pool" : "max"
+		},
+		"branch" : ["global"],
+		"optimizer" : "Adam",
+		"lr_scheduler" : "ReduceLROnPlateau",
+		"loss" : "BCELoss",
+		"max_batch" : {
+			"global" : 10
+		}
+	},
+	"chexnet2" : {
+		"net" : {
+			"backbone" : "densenet121",
+			"last_pool" : "max"
+		},
+		"branch" : ["global"],
+		"optimizer" : "Adam",
+		"lr_scheduler" : "ReduceLROnPlateau",
+		"loss" : "BCELoss",
+		"max_batch" : {
+			"global" : 10
+		}
+	},
 	"chestxray14" : {
 		"net" : {
 			"backbone" : "resnet50",
@@ -33,7 +59,7 @@
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",
-		"lr_scheduler" : "StepLR",
+		"lr_scheduler" : "ReduceLROnPlateau",
 		"loss" : "BCELoss",
 		"max_batch" : {
 			"global" : 20
@@ -45,7 +71,7 @@
 			"last_pool" : "max"
 		},
 		"branch" : ["global"],
-		"optimizer" : "Adam",
+		"optimizer" : "SGD",
 		"lr_scheduler" : "ReduceLROnPlateau",
 		"loss" : "BCELoss",
 		"max_batch" : {

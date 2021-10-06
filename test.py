@@ -196,14 +196,14 @@ def main():
 		AUROCs_fusion = compute_AUCs(ground_truth, pred_fusion)
 		AUROCs_fusion_avg = np.array(AUROCs_fusion).mean()
 
-	write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs.csv'),
+	write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs' + add_text + '.csv'),
 						data = ['Global'] + list(AUROCs_global) + [AUROCs_global_avg],
 						mode = 'a')
 	if args.branch == 'all':
-		write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs.csv'),
+		write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs' + add_text + '.csv'),
 							data = ['Local'] + list(AUROCs_local) + [AUROCs_local_avg],
 							mode = 'a')
-		write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs.csv'),
+		write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs' + add_text + '.csv'),
 							data = ['Fusion'] + list(AUROCs_fusion) + [AUROCs_fusion_avg],
 							mode = 'a')
 

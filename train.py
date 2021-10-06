@@ -288,21 +288,24 @@ def main():
 	# ================= TRANSFORMS ================= #
 
 	# normalize = transforms.Normalize(
-	#    mean=[0.485, 0.456, 0.406],
-	#    std=[0.229, 0.224, 0.225]
+	#    mean=torch.tensor([[0.485, 0.456, 0.406]]).mean(1),
+	#    std=torch.tensor([[0.229, 0.224, 0.225]]).mean(1)
 	# )
+	normalize = transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
 
 	transform_init = transforms.Resize(tuple(config['dataset']['resize']))
 	transform_train = transforms.Compose(
 	   transforms.RandomResizedCrop(tuple(config['dataset']['crop']), (0.25, 1.0)),
 	   transforms.RandomHorizontalFlip(),
 	   transforms.ToTensor(),
+	   # transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
 	   transforms.DynamicNormalize()
 	)
 
 	transform_test = transforms.Compose(
 	   transforms.CenterCrop(tuple(config['dataset']['crop'])),
 	   transforms.ToTensor(),
+	   # transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
 	   transforms.DynamicNormalize()
 	)
 

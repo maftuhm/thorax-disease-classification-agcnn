@@ -126,7 +126,7 @@ class ResNet(nn.Module):
 
     def __init__(self, block, layers, num_classes=1000, zero_init_residual=False,
                  groups=1, width_per_group=64, replace_stride_with_dilation=None,
-                 norm_layer=None, last_pool = 'lse', lse_pool_controller = 10, one_channel = True):
+                 norm_layer=None, last_pool = 'lse', lse_pool_controller = 10, is_grayscale = True):
         super(ResNet, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -144,11 +144,11 @@ class ResNet(nn.Module):
         self.groups = groups
         self.base_width = width_per_group
 
-        num_channel = 3
-        if one_channel:
-            num_channel = 1
+        in_channel = 3
+        if is_grayscale:
+            in_channel = 1
 
-        self.conv1 = nn.Conv2d(num_channel, self.inplanes, kernel_size=7, stride=2, padding=3,
+        self.conv1 = nn.Conv2d(in_channel, self.inplanes, kernel_size=7, stride=2, padding=3,
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
         self.controllerelu = nn.ReLU(inplace=True)
@@ -237,14 +237,14 @@ class ResNet(nn.Module):
         return self._forward_impl(x)
 
 
-def ResNet50(pretrained = True, num_classes = 14, one_channel = True, last_pool = 'lse', lse_pool_controller = 10, group_norm = False, **kwargs):
+def ResNet50(pretrained = True, num_classes = 14, is_grayscale = True, last_pool = 'lse', lse_pool_controller = 10, group_norm = False, **kwargs):
 
     if group_norm:
         norm_layer = lambda x: nn.GroupNorm(32, x)
     else:
         norm_layer = None
 
-    model = ResNet(block = Bottleneck, layers = [3, 4, 6, 3], num_classes = num_classes, one_channel = one_channel,
+    model = ResNet(block = Bottleneck, layers = [3, 4, 6, 3], num_classes = num_classes, is_grayscale = is_grayscale,
                     last_pool = last_pool, lse_pool_controller = lse_pool_controller, norm_layer = norm_layer, **kwargs)
 
     if pretrained:
@@ -256,7 +256,7 @@ def ResNet50(pretrained = True, num_classes = 14, one_channel = True, last_pool 
 
         # loaded_state_dict['fc.weight'], loaded_state_dict['fc.bias'] = reduce_weight_bias(loaded_state_dict['fc.weight'].data, loaded_state_dict['fc.bias'].data, num_classes)
 
-        if one_channel:
+        if is_grayscale:
             loaded_state_dict['conv1.weight'] = loaded_state_dict['conv1.weight'].mean(axis=1, keepdim = True).data
             # loaded_state_dict['conv1.weight'] = (loaded_state_dict['conv1.weight'] ** 2).sum(axis = 1, keepdim=True).sqrt().data
 

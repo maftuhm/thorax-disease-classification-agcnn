@@ -48,8 +48,10 @@ class ChestXrayDataSet(Dataset):
         self.images = []
         self.labels = []
 
-        prefix = 'my_'
-        suffix = '_image-patient-wise'
+        # prefix = 'my_'
+        # suffix = '_image-patient-wise'
+        prefix = ''
+        suffix = ''
         json_raw_files = os.path.join(self.data_dir_path, 'labels', prefix + self.image_set + '_list' + suffix + '.json')
         with open(json_raw_files, "r") as file:
             for data in file:
