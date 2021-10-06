@@ -134,7 +134,7 @@ def main():
 		else:
 			raise Exception("Fusion Model does not exist")
 
-	write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs.csv'),
+	write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs' + add_text + '.csv'),
 						data = ['Model'] + CLASS_NAMES + ['Mean'],
 						mode = 'w')
 
