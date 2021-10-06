@@ -2,7 +2,7 @@
 	"chexnet" : {
 		"net" : {
 			"backbone" : "densenet121",
-			"last_pool" : "avg"
+			"last_pool" : "max"
 		},
 		"branch" : ["global"],
 		"optimizer" : "Adam",
