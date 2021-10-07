@@ -215,5 +215,5 @@ def reduce_weight_bias(weight, bias, num_classes = 14):
     return torch.from_numpy(weight_np), torch.from_numpy(bias_np)
 
 def get_weight_wbce_loss(labels):
-	count_labels = torch.from_numpy(labels).sum(axis=0)
-	return (labels.shape[0] / count_labels) - 1
+	count_labels = torch.FloatTensor(labels).sum(axis=0)
+	return (len(labels) / count_labels) - 1

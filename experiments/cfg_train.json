@@ -84,7 +84,8 @@
 			"last_pool" : "max"
 		},
 		"branch" : ["global"],
-		"optimizer" : "Adam",
+		"optimizer" : "SGD",
+		"lr_scheduler" : "ReduceLROnPlateau",
 		"loss" : "WeightedBCELoss",
 		"max_batch" : {
 			"global" : 10

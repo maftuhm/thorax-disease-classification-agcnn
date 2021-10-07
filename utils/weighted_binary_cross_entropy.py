@@ -12,7 +12,7 @@ def weighted_binary_cross_entropy(sigmoid_x, targets, pos_weight, neg_weight, we
     if not (targets.size() == sigmoid_x.size()):
         raise ValueError("Target size ({}) must be the same as input size ({})".format(targets.size(), sigmoid_x.size()))
 
-    sigmoid_x = sigmoid_x.clamp(min=1e-7, max=1-1e-7)
+    sigmoid_x = sigmoid_x.clamp(min=1e-7)
     loss = - pos_weight * targets * sigmoid_x.log().clamp(min=-100) - neg_weight * (1 - targets) * (1 - sigmoid_x).log().clamp(min=-100)
 
     if weight is not None:
@@ -26,7 +26,7 @@ def weighted_binary_cross_entropy(sigmoid_x, targets, pos_weight, neg_weight, we
         return loss.sum()
 
 class WeightedBCELoss(nn.Module):
-    def __init__(self, pos_weight=1, neg_weight=1, weight=None, PosNegWeightIsDynamic=False, WeightIsDynamic=False, size_average=True, reduce=True):
+    def __init__(self, pos_weight=torch.tensor(1.), neg_weight=torch.tensor(1.), weight=None, PosNegWeightIsDynamic=False, WeightIsDynamic=False, size_average=True, reduce=True):
         """
         Args:
             pos_weight = Weight for postive samples. Size [1,C]
@@ -37,8 +37,8 @@ class WeightedBCELoss(nn.Module):
         super().__init__()
 
         self.register_buffer('weight', weight)
-        self.register_buffer('pos_weight', torch.tensor(pos_weight))
-        self.register_buffer('neg_weight', torch.tensor(neg_weight))
+        self.register_buffer('pos_weight', pos_weight)
+        self.register_buffer('neg_weight', neg_weight)
         self.size_average = size_average
         self.reduce = reduce
         self.PosNegWeightIsDynamic = PosNegWeightIsDynamic
