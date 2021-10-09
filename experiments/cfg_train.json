@@ -97,10 +97,42 @@
 			"last_pool" : "max"
 		},
 		"branch" : ["global"],
-		"optimizer" : "Adam",
+		"optimizer" : "SGD",
+		"lr_scheduler" : "ReduceLROnPlateau",
 		"loss" : "WeightedBCELoss",
 		"max_batch" : {
 			"global" : 10
+		}
+	},
+	"__comment__": "with modified WeightedBCELoss",
+	"agcnn4" : {
+		"net" : {
+			"backbone" : "densenet121",
+			"last_pool" : "max"
+		},
+		"branch" : ["global"],
+		"optimizer" : "SGD",
+		"lr_scheduler" : "ReduceLROnPlateau",
+		"loss" : "WeightedBCELoss",
+		"max_batch" : {
+			"global" : 10,
+			"local" : 10,
+			"fusion" : 10
+		}
+	},
+	"agcnn5" : {
+		"net" : {
+			"backbone" : "densenet121",
+			"last_pool" : "max"
+		},
+		"branch" : ["global"],
+		"optimizer" : "SGD",
+		"lr_scheduler" : "ReduceLROnPlateau",
+		"loss" : "WeightedBCELoss",
+		"max_batch" : {
+			"global" : 10,
+			"local" : 10,
+			"fusion" : 10
 		}
 	}
 }

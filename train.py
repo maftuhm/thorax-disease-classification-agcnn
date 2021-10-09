@@ -294,18 +294,18 @@ def main():
 
 	transform_init = transforms.Resize(tuple(config['dataset']['resize']))
 	transform_train = transforms.Compose(
-	   transforms.RandomResizedCrop(tuple(config['dataset']['crop']), (0.5, 1.0)),
+	   transforms.RandomResizedCrop(tuple(config['dataset']['crop']), (0.75, 1.0)),
 	   transforms.RandomHorizontalFlip(),
 	   transforms.ToTensor(),
-	   # transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
-	   transforms.DynamicNormalize()
+	   transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
+	   # transforms.DynamicNormalize()
 	)
 
 	transform_test = transforms.Compose(
 	   transforms.CenterCrop(tuple(config['dataset']['crop'])),
 	   transforms.ToTensor(),
-	   # transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
-	   transforms.DynamicNormalize()
+	   transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
+	   # transforms.DynamicNormalize()
 	)
 
 	if args.resume:
@@ -340,15 +340,15 @@ def main():
 		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 5, pin_memory = True, drop_last=True)
 
 		val_dataset = ChestXrayDataSet(DATA_DIR, 'val', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, num_workers = 5, pin_memory = True)
+		val_loader = DataLoader(dataset = val_dataset, batch_size = (config['batch_size'][branch_name] // 4) if config['loss'] == 'BCELoss' else MAX_BATCH_CAPACITY[branch_name], shuffle = False, num_workers = 5, pin_memory = True)
 
 		test_dataset = ChestXrayDataSet(DATA_DIR, 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 2, shuffle = False, num_workers = 5, pin_memory = True)
+		test_loader = DataLoader(dataset = test_dataset, batch_size = (config['batch_size'][branch_name] // 4) if config['loss'] == 'BCELoss' else MAX_BATCH_CAPACITY[branch_name], shuffle = False, num_workers = 5, pin_memory = True)
 
 		if config['loss'] == 'BCELoss':
 			criterion = nn.BCELoss()
 		elif config['loss'] == 'WeightedBCELoss':
-			criterion = WeightedBCELoss(weight = torch.tensor(0.1), PosNegWeightIsDynamic = True)
+			criterion = WeightedBCELoss(PosNegWeightIsDynamic = True)
 			# criterion = dict(
 			# 	train = WeightedBCELoss(weight = torch.tensor(0.1), pos_weight = get_weight_wbce_loss(train_dataset.labels)),
 			# 	val = WeightedBCELoss(weight = torch.tensor(0.1), pos_weight = get_weight_wbce_loss(val_dataset.labels)),
@@ -370,7 +370,7 @@ def main():
 			TestModel = None
 
 		if branch_name == 'local':
-			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_loss' + '.pth'))
+			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_auroc' + '.pth'))
 			GlobalModel.load_state_dict(save_dict_global['net'])
 
 			for param in GlobalModel.parameters():
@@ -387,8 +387,8 @@ def main():
 			torch.cuda.empty_cache()
 
 		if branch_name == 'fusion':
-			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_loss' + '.pth'), map_location='cpu')
-			save_dict_local = torch.load(os.path.join(exp_dir_num, args.exp_num + '_local_best_loss' + '.pth'), map_location='cpu')
+			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_auroc' + '.pth'), map_location='cpu')
+			save_dict_local = torch.load(os.path.join(exp_dir_num, args.exp_num + '_local_best_auroc' + '.pth'), map_location='cpu')
 
 			GlobalModel.load_state_dict(save_dict_global['net'])
 			LocalModel.load_state_dict(save_dict_local['net'])
@@ -448,8 +448,8 @@ def main():
 			checkpoint_best_loss = path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_loss.pth')
 
 			if path.isfile(checkpoint_best_auroc) and path.isfile(checkpoint_best_loss):
-				save_dict_best_loss = torch.load(checkpoint_best_loss, map_location='cpu')
-				save_dict_best_auroc = torch.load(checkpoint_best_auroc, map_location='cpu')
+				save_dict_best_loss = torch.load(checkpoint_best_loss)
+				save_dict_best_auroc = torch.load(checkpoint_best_auroc)
 				BEST_LOSS[branch_name] = save_dict_best_loss.get('loss', 1000.)
 				BEST_AUROCs[branch_name] = save_dict_best_auroc.get('auroc', 0.)
 				print(" latest best loss:", BEST_LOSS[branch_name])

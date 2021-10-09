@@ -12,7 +12,7 @@ def weighted_binary_cross_entropy(sigmoid_x, targets, pos_weight, neg_weight, we
     if not (targets.size() == sigmoid_x.size()):
         raise ValueError("Target size ({}) must be the same as input size ({})".format(targets.size(), sigmoid_x.size()))
 
-    sigmoid_x = sigmoid_x.clamp(min=1e-7)
+    # sigmoid_x = sigmoid_x.clamp(min=1e-7)
     loss = - pos_weight * targets * sigmoid_x.log().clamp(min=-100) - neg_weight * (1 - targets) * (1 - sigmoid_x).log().clamp(min=-100)
 
     if weight is not None:
@@ -45,11 +45,11 @@ class WeightedBCELoss(nn.Module):
 
     def forward(self, input, target):
         if self.PosNegWeightIsDynamic:
-            len_target = target.numel()
-            positive_counts = target.sum()
+            len_target = target.shape[0]
+            positive_counts = target.sum(dim=0)
             negative_counts = len_target - positive_counts
-            self.pos_weight = len_target / positive_counts.clamp(min = 1)
-            self.neg_weight = len_target / negative_counts.clamp(min = 1)
+            self.pos_weight = (len_target / positive_counts).clamp(max=len_target+1)
+            self.neg_weight = (len_target / negative_counts).clamp(max=len_target+1)
 
         if self.weight is not None:
             return weighted_binary_cross_entropy(input, target,

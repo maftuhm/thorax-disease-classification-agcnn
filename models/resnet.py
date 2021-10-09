@@ -280,14 +280,14 @@ def ResNet50(pretrained = True, num_classes = 14, is_grayscale = True, last_pool
 
     return model
 
-def ResNet101(pretrained = True, num_classes = 14, one_channel = True, last_pool = 'lse', lse_pool_controller = 10, group_norm = False, **kwargs):
+def ResNet101(pretrained = True, num_classes = 14, is_grayscale = True, last_pool = 'lse', lse_pool_controller = 10, group_norm = False, **kwargs):
 
     if group_norm:
         norm_layer = lambda x: nn.GroupNorm(32, x)
     else:
         norm_layer = None
 
-    model = ResNet(block = Bottleneck, layers = [3, 4, 23, 3], num_classes = num_classes, one_channel = one_channel,
+    model = ResNet(block = Bottleneck, layers = [3, 4, 23, 3], num_classes = num_classes, is_grayscale = is_grayscale,
                     last_pool = last_pool, lse_pool_controller = lse_pool_controller, norm_layer = norm_layer, **kwargs)
 
     if pretrained:
@@ -297,7 +297,7 @@ def ResNet101(pretrained = True, num_classes = 14, one_channel = True, last_pool
 
         del loaded_state_dict['fc.weight'], loaded_state_dict['fc.bias']
 
-        if one_channel:
+        if is_grayscale:
             loaded_state_dict['conv1.weight'] = loaded_state_dict['conv1.weight'].mean(axis=1, keepdim = True).data
 
         model_state_dict = model.state_dict()

@@ -123,7 +123,7 @@ class UnNormalize(object):
 		return out_tensor
 
 def draw_bounding_box(image, bbox, label = None):
-	img_to_draw = transforms_th.ToPILImage()(image)
+	img_to_draw = transforms_th.ToPILImage()(image).convert('RGB')
 	draw = ImageDraw.Draw(img_to_draw)
 	draw.rectangle(bbox, outline=(0, 255, 0))
 
