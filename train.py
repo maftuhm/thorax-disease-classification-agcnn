@@ -464,11 +464,15 @@ def main():
 			start_time_epoch = datetime.now()
 
 			train_one_epoch(epoch, branch_name, Model, optimizer, lr_scheduler, train_loader, criterion['train'].to(device) if isinstance(criterion, dict) else criterion, TestModel)
-			
+
 			val_auroc, val_loss = val_one_epoch(epoch, branch_name, Model, val_loader, criterion['val'].to(device) if isinstance(criterion, dict) else criterion, TestModel)
-			
+
 			if isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
-				lr_scheduler.step(val_loss)
+				distance_loss_auroc = torch.tensor([val_auroc, val_loss]) ** 2
+				distance_loss_auroc = distance_loss_auroc.sum().sqrt()
+				writer.add_scalars("val/distance_loss_auroc", {branch_name: distance_loss_auroc}, epoch)
+
+				lr_scheduler.step(distance_loss_auroc)
 			else:
 				lr_scheduler.step()
 
