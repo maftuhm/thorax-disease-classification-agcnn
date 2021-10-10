@@ -294,18 +294,18 @@ def main():
 
 	transform_init = transforms.Resize(tuple(config['dataset']['resize']))
 	transform_train = transforms.Compose(
-	   transforms.RandomResizedCrop(tuple(config['dataset']['crop']), (0.75, 1.0)),
+	   transforms.RandomResizedCrop(tuple(config['dataset']['crop']), (0.25, 1.0)),
 	   transforms.RandomHorizontalFlip(),
 	   transforms.ToTensor(),
-	   transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
-	   # transforms.DynamicNormalize()
+	   # transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
+	   transforms.DynamicNormalize()
 	)
 
 	transform_test = transforms.Compose(
 	   transforms.CenterCrop(tuple(config['dataset']['crop'])),
 	   transforms.ToTensor(),
-	   transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
-	   # transforms.DynamicNormalize()
+	   # transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
+	   transforms.DynamicNormalize()
 	)
 
 	if args.resume:
@@ -340,10 +340,10 @@ def main():
 		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 5, pin_memory = True, drop_last=True)
 
 		val_dataset = ChestXrayDataSet(DATA_DIR, 'val', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		val_loader = DataLoader(dataset = val_dataset, batch_size = (config['batch_size'][branch_name] // 4) if config['loss'] == 'BCELoss' else MAX_BATCH_CAPACITY[branch_name], shuffle = False, num_workers = 5, pin_memory = True)
+		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 4, shuffle = False, num_workers = 5, pin_memory = True)
 
 		test_dataset = ChestXrayDataSet(DATA_DIR, 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		test_loader = DataLoader(dataset = test_dataset, batch_size = (config['batch_size'][branch_name] // 4) if config['loss'] == 'BCELoss' else MAX_BATCH_CAPACITY[branch_name], shuffle = False, num_workers = 5, pin_memory = True)
+		test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 4, shuffle = False, num_workers = 5, pin_memory = True)
 
 		if config['loss'] == 'BCELoss':
 			criterion = nn.BCELoss()
