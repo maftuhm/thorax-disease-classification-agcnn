@@ -14,7 +14,7 @@ import torch.backends.cudnn as cudnn
 
 # import torchvision.transforms as transforms
 
-from model import ResAttCheXNet, FusionNet
+from model import MainNet, FusionNet
 from utils import WeightedBCELoss, AttentionMaskInference, ChestXrayDataSet
 from utils import transforms
 
@@ -118,28 +118,17 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		if branch == 'local':
 			with torch.no_grad():
-				output_global = test_model['global'](images.to(device))
-				output_patches = test_model['attention'](images.detach(), output_global['features'].detach().cpu())
+				_, global_features, _ = test_model['global'](images.to(device))
+				output_patches = test_model['attention'](images.detach(), global_features.detach().cpu())
 				images = output_patches['crop']
-
-				del output_global
-
-		elif branch == 'fusion':
-			with torch.no_grad():
-				output_global = test_model['global'](images.to(device))
-				output_patches = test_model['attention'](images.detach(), output_global['features'].detach().cpu())
-				output_local = test_model['local'](output_patches['crop'].to(device))
-				images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
-
-				del output_global, output_local
 
 		images = images.to(device, non_blocking=True)
 		targets = targets.to(device, non_blocking=True)
 
 		# be careful add last layer with sigmoid if using bceloss or weighted bce loss
 		# and remove sigimoid(output) here
-		output = model(images)
-		loss = criterion(output['out'], targets) / batch_multiplier
+		output, _, output1 = model(images)
+		loss = criterion(output, targets) / batch_multiplier
 		loss.backward()
 
 		if (i + 1) % batch_multiplier == 0:
@@ -149,11 +138,15 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		if i == random_int:
 			if branch == 'global':
-				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['out'].detach())
+				draw_image = drawImage(images_draw['images'], images_draw['targets'], output.detach())
 			else:
+
+				if branch == 'fusion':
+					output_patches = output1
+
 				draw_image = drawImage(images_draw['images'],
 										images_draw['targets'],
-										output['out'].detach(),
+										output.detach(),
 										output_patches['crop'].detach(),
 										output_patches['heatmap'].detach(),
 										output_patches['coordinate'])
@@ -205,19 +198,10 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 			images_draw['targets'] = targets.detach()
 
 		if branch == 'local':
-			output_global = test_model['global'](images.to(device))
-			output_patches = test_model['attention'](images.detach(), output_global['features'].detach().cpu())
+			_, global_features, _ = test_model['global'](images.to(device))
+			output_patches = test_model['attention'](images.detach(), global_features.detach().cpu())
 			images = output_patches['crop']
 
-			del output_global
-		
-		elif branch == 'fusion':
-			output_global = test_model['global'](images.to(device))
-			output_patches = test_model['attention'](images.detach(), output_global['features'].detach().cpu())
-			output_local = test_model['local'](output_patches['crop'].to(device))
-			images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
-
-			del output_global, output_local
 
 		images = images.to(device, non_blocking=True)
 		targets = targets.to(device, non_blocking=True)
@@ -225,23 +209,26 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 
 		# be careful add last layer with sigmoid if using bceloss or weighted bce loss
 		# and remove sigimoid(output) here
-		output = model(images)
-		loss = criterion(output['out'], targets)
+		output, _, output1 = model(images)
+		loss = criterion(output, targets)
 		running_loss += loss.item()
 
 		pred = torch.cat((pred, output['out'].detach().cpu()), 0)
 
 		if i == random_int:
 			if branch == 'global':
-				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['out'].detach())
+				draw_image = drawImage(images_draw['images'], images_draw['targets'], output.detach())
 			else:
+
+				if branch == 'fusion':
+					output_patches = output1
+
 				draw_image = drawImage(images_draw['images'],
 										images_draw['targets'],
-										output['out'].detach(),
+										output.detach(),
 										output_patches['crop'].detach(),
 										output_patches['heatmap'].detach(),
 										output_patches['coordinate'])
-
 
 			writer.add_images("val/{}".format(branch), draw_image, epoch)
 			del images_draw, draw_image
@@ -317,14 +304,14 @@ def main():
 	print("\n Model initialization")
 	print(" ============================================")
 	print(" Global branch")
-	GlobalModel = ResAttCheXNet(pretrained = pretrained, num_classes = NUM_CLASSES, **config['net'])
+	GlobalModel = MainNet(pretrained = pretrained, num_classes = NUM_CLASSES, **config['net'])
 	if 'local' in config['branch']:
 		print(" Local branch")
-		LocalModel = ResAttCheXNet(pretrained = pretrained, num_classes = NUM_CLASSES, **config['net'])
+		LocalModel = MainNet(pretrained = pretrained, num_classes = NUM_CLASSES, **config['net'])
 		AttentionGenPatchs = AttentionMaskInference(threshold = config['threshold'], distance_function = config['L_function'])
 		print(" L distance function \t:", config['L_function'])
 		print(" Threshold \t\t:", config['threshold'])
-		FusionModel = FusionNet(backbone = config['net']['backbone'], num_classes = NUM_CLASSES)
+		FusionModel = FusionNet(threshold = config['threshold'], distance_function = config['L_function'], num_classes = NUM_CLASSES, **config['net'])
 
 	print(" Num classes \t\t:", NUM_CLASSES)
 	print(" Optimizer \t\t:", list(config['optimizer'].keys())[0])
@@ -390,21 +377,24 @@ def main():
 			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_auroc' + '.pth'), map_location='cpu')
 			save_dict_local = torch.load(os.path.join(exp_dir_num, args.exp_num + '_local_best_auroc' + '.pth'), map_location='cpu')
 
-			GlobalModel.load_state_dict(save_dict_global['net'])
-			LocalModel.load_state_dict(save_dict_local['net'])
+			# GlobalModel.load_state_dict(save_dict_global['net'])
+			# LocalModel.load_state_dict(save_dict_local['net'])
 
-			for param in GlobalModel.parameters():
-				param.requires_grad = False
+			# for param in GlobalModel.parameters():
+			# 	param.requires_grad = False
 
-			for param in LocalModel.parameters():
-				param.requires_grad = False
+			# for param in LocalModel.parameters():
+			# 	param.requires_grad = False
+
+			FusionModel.load_main_weights(save_dict_global['net'], save_dict_local['net'])
 
 			Model = FusionModel.to(device)
-			TestModel = {
-				'global' : GlobalModel.to(device), 
-				'attention' : AttentionGenPatchs, 
-				'local' : LocalModel.to(device)
-			}
+			TestModel = None
+			# TestModel = {
+			# 	'global' : GlobalModel.to(device), 
+			# 	'attention' : AttentionGenPatchs, 
+			# 	'local' : LocalModel.to(device)
+			# }
 			# TestModel['attention'].eval()
 			# for key in TestModel: TestModel[key].eval()
 			del save_dict_global, save_dict_local

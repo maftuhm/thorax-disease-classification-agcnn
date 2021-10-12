@@ -52,9 +52,8 @@ def binImage(heatmap, threshold = 0.7, thresh_otsu = False):
         _, heatmap_bin = cv2.threshold(heatmap , int(255 * threshold) , 255 , cv2.THRESH_BINARY)
     return heatmap_bin
 
-class AttentionMaskInference(nn.Module):
+class AttentionMaskInference:
     def __init__(self, threshold = 0.7, distance_function = "Lmax", size = (224, 224), mode = 'bilinear'):
-        super(AttentionMaskInference, self).__init__()
 
         if distance_function == "Lmax":
             self.distance = lambda x: normalize01(Lmax(x, 1))
@@ -68,7 +67,7 @@ class AttentionMaskInference(nn.Module):
         self.resize = nn.Upsample(size=size, mode = mode, align_corners = True)
         self.threshold = threshold
 
-    def forward(self, x, features):
+    def __call__(self, x, features):
         heatmap = self.distance(features)
         out_heatmap = self.resize(heatmap.unsqueeze(1)).squeeze(1)
 

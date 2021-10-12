@@ -2,63 +2,73 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from models import ResNet50, ResNet101, DenseNet121
+from utils import AttentionMaskInference
 
-class ResAttCheXNet(nn.Module):
-    def __init__(self, last_pool = 'lse', lse_pool_controller = 5, 
-                backbone = 'resnet50', pretrained = True, 
-                num_classes = 14, group_norm = False, **kwargs):
-        super(ResAttCheXNet, self).__init__()
+def MainNet(last_pool = 'lse', lse_pool_controller = 5, 
+            backbone = 'resnet50', pretrained = True, 
+            num_classes = 14, group_norm = False, **kwargs):
 
-        # ----------------- Backbone -----------------
-        if backbone == 'resnet50':
-            self.backbone = ResNet50(pretrained = pretrained,
-                                    num_classes = num_classes,
-                                    last_pool = last_pool,
-                                    lse_pool_controller = lse_pool_controller,
-                                    group_norm = group_norm,
-                                    **kwargs)
+    # ----------------- Backbone -----------------
+    if backbone == 'resnet50':
+        model = ResNet50(pretrained = pretrained,
+                        num_classes = num_classes,
+                        last_pool = last_pool,
+                        lse_pool_controller = lse_pool_controller,
+                        group_norm = group_norm,
+                        **kwargs)
 
-        elif backbone == 'resnet101':
-            self.backbone = ResNet101(pretrained = pretrained,
-                                        num_classes = num_classes,
-                                        last_pool = last_pool,
-                                        lse_pool_controller = lse_pool_controller,
-                                        **kwargs)
+    elif backbone == 'resnet101':
+        model = ResNet101(pretrained = pretrained,
+                        num_classes = num_classes,
+                        last_pool = last_pool,
+                        lse_pool_controller = lse_pool_controller,
+                        **kwargs)
 
-        elif backbone == 'densenet121':
-            self.backbone = DenseNet121(pretrained = pretrained,
-                                        num_classes = num_classes,
-                                        last_pool = last_pool,
-                                        lse_pool_controller = lse_pool_controller,
-                                        **kwargs)
-        else:
-            raise Exception("backbone must be resnet50, resnet101 or densenet121")
+    elif backbone == 'densenet121':
+        model = DenseNet121(pretrained = pretrained,
+                            num_classes = num_classes,
+                            last_pool = last_pool,
+                            lse_pool_controller = lse_pool_controller,
+                            **kwargs)
+    else:
+        raise Exception("backbone must be resnet50, resnet101 or densenet121")
 
-        print(" Backbone \t\t:", backbone)
-        print(" Last pooling layer\t:", last_pool)
-        print(" Pretrained model \t:", pretrained)
-        if last_pool == 'lse':
-            print(" lse pooling controller :", lse_pool_controller)
+    print(" Backbone \t\t:", backbone)
+    print(" Last pooling layer\t:", last_pool)
+    print(" Pretrained model \t:", pretrained)
+    if last_pool == 'lse':
+        print(" lse pooling controller :", lse_pool_controller)
         # print(" Group normalization \t:", group_norm)
 
-    def forward(self, image):
-        out, features, pool = self.backbone(image)
-
-        output = {
-            'out' : out,
-            'features' : features,
-            'pool' : pool,
-        }
-
-        return output
+    return model
 
 
 class FusionNet(nn.Module):
-    def __init__(self, backbone = 'resnet50', num_classes = 14, add_layer = False, **kwargs):
+    def __init__(self, threshold, distance_function, last_pool = 'lse', lse_pool_controller = 5, 
+                backbone = 'resnet50', pretrained = True, 
+                num_classes = 14, group_norm = False, **kwargs):
 
         super(FusionNet, self).__init__()
 
         # ----------------- Backbone -----------------
+
+        self.global_net = MainNet(pretrained = False,
+                                backbone = backbone,
+                                num_classes = num_classes,
+                                last_pool = last_pool,
+                                lse_pool_controller = lse_pool_controller,
+                                group_norm = group_norm,
+                                **kwargs)
+
+        self.local_net = MainNet(pretrained = False,
+                                backbone = backbone,
+                                num_classes = num_classes,
+                                last_pool = last_pool,
+                                lse_pool_controller = lse_pool_controller,
+                                group_norm = group_norm,
+                                **kwargs)
+
+        self.attention_mask = AttentionMaskInference(threshold, distance_function)
 
         self.add_layer = add_layer
 
@@ -80,8 +90,12 @@ class FusionNet(nn.Module):
 
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, pool):
-        out = self.fc(pool)
+    def forward(self, img):
+        _, global_features, global_pool = self.global_net(img)
+        out_patches = self.attention_mask(img, global_features.cpu())
+        _, _, local_pool = self.local_net(out_patches['out'])
+        fusion = torch.cat((global_pool, local_pool), dim = 1).to(img.device)
+        out = self.fc(fusion)
 
         if self.add_layer:
             out = self.relu(out)
@@ -93,4 +107,8 @@ class FusionNet(nn.Module):
 
         out = self.sigmoid(out)
 
-        return {'out': out}
+        return out, out, out_patches
+
+    def load_main_weights(self, global_weight, local_weight):
+        self.global_net.load_state_dict(global_weight)
+        self.local_net.load_state_dict(local_weight)
