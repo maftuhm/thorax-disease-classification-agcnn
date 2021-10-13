@@ -122,10 +122,14 @@ class UnNormalize(object):
 			# The normalize code -> t.sub_(m).div_(s)
 		return out_tensor
 
-def draw_bounding_box(image, bbox, label = None):
+def draw_bounding_box(image, bbox, label = None, color=(0, 255, 0)):
 	img_to_draw = transforms_th.ToPILImage()(image).convert('RGB')
 	draw = ImageDraw.Draw(img_to_draw)
-	draw.rectangle(bbox, outline=(0, 255, 0))
+	if isinstance(bbox[0], list):
+		for bb in bbox:
+			draw.rectangle(bb, outline=color)
+	else:
+		draw.rectangle(bbox, outline=color)
 
 	if label is not None:
 		draw.text((bbox[0] + 2, bbox[1]), label)
@@ -161,7 +165,7 @@ def draw_label_score(target, scores, size = (224, 224)):
 	
 	return transforms_th.ToTensor()(new_images).unsqueeze(0)
 
-def drawImage(images, target, scores, images_cropped = None, heatmaps = None, coordinates = None):
+def drawImage(images, target, scores, images_cropped = None, heatmaps = None, gt_coordinates=None, coordinates = None):
 	bz, c, h, w = images.shape # batch_size, channel, height, width
 
 	# unnormalize = UnNormalize(mean=[0.4979839647692935], std=[0.22962109349599796]) # ori
@@ -180,8 +184,15 @@ def drawImage(images, target, scores, images_cropped = None, heatmaps = None, co
 		img_scores = torch.cat((img_scores, draw_label_score(target[i], scores[i], size = (h, w))), 0)
 
 		if images_cropped is not None:
-			img = torch.cat((img, draw_bounding_box(unnormalize(images[i]), coordinates[i])), 0)
-			img_heatmap = torch.cat((img_heatmap, draw_heatmap(unnormalize(images[i]), heatmaps[i])), 0)
+			image_drawed_bbox = unnormalize(images[i])
+
+			if gt_coordinates is not None:
+				if len(gt_coordinates) > 0:
+					image_drawed_bbox = draw_bounding_box(image_drawed_bbox, gt_coordinates[i], color=(255, 0, 0))
+
+			img = torch.cat((img, image_drawed_bbox), 0)
+			image_drawed_bbox =  draw_bounding_box(draw_heatmap(unnormalize(images[i]), heatmaps[i]), coordinates[i])
+			img_heatmap = torch.cat((img_heatmap, image_drawed_bbox), 0)
 			img_crop = torch.cat((img_crop, unnormalize(images_cropped[i]).unsqueeze(0)), 0)
 		else:
 			img = torch.cat((img, unnormalize(images[i]).unsqueeze(0)), 0)
