@@ -125,5 +125,25 @@
 		"branch" : ["local", "fusion"],
 		"L_function" : "L2",
 		"threshold" : 0.5
+	},
+	"agcnn6" : {
+		"net" : "agcnn4",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L2",
+		"threshold" : 0.6
+	},
+	"agcnn7" : {
+		"NUM_EPOCH" : 25,
+		"net" : {
+			"backbone" : "densenet121",
+			"last_pool" : "avg"
+		},
+		"branch" : ["global"],
+		"optimizer" : "Adam",
+		"lr_scheduler" : "ReduceLROnPlateau",
+		"loss" : "BCELoss",
+		"max_batch" : {
+			"global" : 10
+		}
 	}
 }
