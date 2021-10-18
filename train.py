@@ -106,7 +106,7 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 	weight_last_updated = 0
 
 	progressbar = tqdm(range(len_data))
-	for i, (images, targets, bboxes) in enumerate(data_loader):
+	for i, (images, targets) in enumerate(data_loader):
 
 		if (i + 1) > (len_data - len_data % batch_multiplier):
 			batch_multiplier = len_data % batch_multiplier
@@ -190,7 +190,7 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 	print(" Display images on index", random_int)
 
 	progressbar = tqdm(range(len_data))
-	for i, (images, targets, bboxes) in enumerate(data_loader):
+	for i, (images, targets) in enumerate(data_loader):
 
 		if i == random_int:
 			images_draw = {}
@@ -203,8 +203,8 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 			images = output_patches['crop']
 
 
-		images = images.to(device, non_blocking=True)
-		targets = targets.to(device, non_blocking=True)
+		images = images.to(device)
+		targets = targets.to(device)
 		gt = torch.cat((gt, targets.detach().cpu()), 0)
 
 		# be careful add last layer with sigmoid if using bceloss or weighted bce loss
@@ -296,18 +296,16 @@ def main():
 	)
 
 	if args.resume:
-		pretrained = False
-	else:
-		pretrained = True
+		config['net'].update({"pretrained" : False})
 
 	# ================= MODELS ================= #
 	print("\n Model initialization")
 	print(" ============================================")
 	print(" Global branch")
-	GlobalModel = MainNet(pretrained = pretrained, num_classes = NUM_CLASSES, **config['net'])
+	GlobalModel = MainNet(num_classes = NUM_CLASSES, **config['net'])
 	if 'local' in config['branch']:
 		print(" Local branch")
-		LocalModel = MainNet(pretrained = pretrained, num_classes = NUM_CLASSES, **config['net'])
+		LocalModel = MainNet(num_classes = NUM_CLASSES, **config['net'])
 		AttentionGenPatchs = AttentionMaskInference(threshold = config['threshold'], distance_function = config['L_function'])
 		print(" L distance function \t:", config['L_function'])
 		print(" Threshold \t\t:", config['threshold'])
@@ -323,14 +321,14 @@ def main():
 		start_time_train = datetime.now()
 
 		# ================= LOAD DATASET ================= #
-		train_dataset = ChestXrayDataSet(DATA_DIR, 'train', num_classes = NUM_CLASSES, transform = transform_train, init_transform=transform_init, get_bbox=True)
+		train_dataset = ChestXrayDataSet(DATA_DIR, 'train', num_classes = NUM_CLASSES, transform = transform_train, init_transform=transform_init)
 		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 5, pin_memory = True, drop_last=True)
 
-		val_dataset = ChestXrayDataSet(DATA_DIR, 'val', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init, get_bbox=True)
-		val_loader = DataLoader(dataset = val_dataset, batch_size = config['batch_size'][branch_name] // 4, shuffle = False, num_workers = 5, pin_memory = True)
+		val_dataset = ChestXrayDataSet(DATA_DIR, 'val', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
+		val_loader = DataLoader(dataset = val_dataset, batch_size = 90, shuffle = False, num_workers = 5, pin_memory = False)
 
-		test_dataset = ChestXrayDataSet(DATA_DIR, 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init, get_bbox=True)
-		test_loader = DataLoader(dataset = test_dataset, batch_size = config['batch_size'][branch_name] // 4, shuffle = False, num_workers = 5, pin_memory = True)
+		test_dataset = ChestXrayDataSet(DATA_DIR, 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
+		test_loader = DataLoader(dataset = test_dataset, batch_size = 90, shuffle = False, num_workers = 5, pin_memory = False)
 
 		if config['loss'] == 'BCELoss':
 			criterion = nn.BCELoss()

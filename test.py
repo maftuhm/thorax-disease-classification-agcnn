@@ -14,7 +14,7 @@ import torch.backends.cudnn as cudnn
 
 # import torchvision.transforms as transforms
 
-from model import ResAttCheXNet, FusionNet
+from model import MainNet, FusionNet
 from utils import WeightedBCELoss, AttentionMaskInference, ChestXrayDataSet
 from utils import transforms
 
@@ -63,7 +63,7 @@ if 'num_classes' in list(config.keys()):
 
 NUM_CLASSES = len(CLASS_NAMES)
 
-MAX_BATCH_CAPACITY = 32
+MAX_BATCH_CAPACITY = 120
 
 cudnn.benchmark = True
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -89,10 +89,10 @@ def main():
 	test_loader = DataLoader(dataset = test_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = False, num_workers = 0, pin_memory = True)
 
 	# ================= MODELS ================= #
-	GlobalModel = ResAttCheXNet(pretrained = False, num_classes = NUM_CLASSES, **config['net']).to(device)
+	GlobalModel = MainNet(pretrained = False, num_classes = NUM_CLASSES, **config['net']).to(device)
 	
 	if args.branch == 'all':
-		LocalModel = ResAttCheXNet(pretrained = False, num_classes = NUM_CLASSES, **config['net']).to(device)
+		LocalModel = MainNet(pretrained = False, num_classes = NUM_CLASSES, **config['net']).to(device)
 		AttentionGenPatchs = AttentionMaskInference(threshold = config['threshold'], distance_function = config['L_function'])
 		FusionModel = FusionNet(backbone = config['net']['backbone'], num_classes = NUM_CLASSES).to(device)
 
@@ -155,7 +155,7 @@ def main():
 	start_time_test = datetime.now()
 	for i, (image, target) in enumerate(test_loader):
 		# compute output
-		output_global = GlobalModel(image.to(device))
+		output_global, _, _ = GlobalModel(image.to(device))
 
 		if args.branch == 'all':
 			output_patches = AttentionGenPatchs(image.detach(), output_global['features'].detach().cpu())
@@ -166,7 +166,7 @@ def main():
 			output_fusion = FusionModel(pool.to(device))
 
 		ground_truth = torch.cat((ground_truth, target.detach()), 0)
-		pred_global = torch.cat((pred_global.detach(), output_global['out'].detach().cpu()), 0)
+		pred_global = torch.cat((pred_global.detach(), output_global.detach().cpu()), 0)
 
 		if args.branch == 'all':
 			pred_local = torch.cat((pred_local.detach(), output_local['out'].detach().cpu()), 0)

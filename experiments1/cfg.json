@@ -1,14 +1,14 @@
 {
-	"NUM_EPOCH" : 50,
+	"NUM_EPOCH" : 30,
 	"num_classes" : 14,
 	"dataset" : {
 		"resize" : [256, 256],
 		"crop" : [224, 224]
 	},
 	"batch_size" : {
-		"global" : 120,
-		"local" : 120,
-		"fusion" : 120
+		"global" : 80,
+		"local" : 80,
+		"fusion" : 80
 	},
 	"optimizer" : {
 		"SGD" : {
@@ -33,13 +33,13 @@
 			"mode" : "max", 
 			"patience" : 2,
 			"factor" : 0.1,
-			"threshold" : 0.01,
+			"threshold" : 0.001,
 			"verbose" : true
 		}
 	},
 	"max_batch" : {
-		"global" : 16,
-		"local" : 14,
-		"fusion" : 4
+		"global" : 20,
+		"local" : 16,
+		"fusion" : 10
 	}
 }

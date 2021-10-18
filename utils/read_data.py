@@ -7,7 +7,7 @@ from torch.utils.data import Dataset
 
 class ChestXrayDataSet(Dataset):
     
-    def __init__(self, data_dir, image_set, num_classes=14, transform=None, init_transform = None, get_bbox = False):
+    def __init__(self, data_dir, image_set, num_classes=14, transform=None, init_transform = None):
 
         assert image_set in {'train', 'val', 'test'}, "image_set is not valid!"
         self.data_dir_path = data_dir
@@ -15,7 +15,6 @@ class ChestXrayDataSet(Dataset):
         self.num_classes = num_classes
         self.transform = transform
         self.init_transform = init_transform
-        self.return_bbox = get_bbox
 
         self.static_images_dir = 'images_' + str(init_transform).lower()
 
@@ -48,33 +47,24 @@ class ChestXrayDataSet(Dataset):
     def create_index(self):
         self.images = []
         self.labels = []
-        self.bboxes = []
 
         # prefix = 'my_'
-        # suffix = '_image-patient-wise'            
+        # suffix = '_image-patient-wise'
         prefix = ''
         suffix = ''
-        if self.return_bbox:
-            suffix += '_with_bbox' 
-
         json_raw_files = os.path.join(self.data_dir_path, 'labels', prefix + self.image_set + '_list' + suffix + '.json')
         with open(json_raw_files, "r") as file:
             for data in file:
                 data = json.loads(data)
                 self.images.append(os.path.join(self.data_dir_path, self.static_images_dir, data['index']))
                 self.labels.append(data['label'][:self.num_classes])
-                self.bboxes.append(data.get('bbox', []))
 
     def __getitem__(self, index):
         image = cv2.imread(self.images[index], cv2.IMREAD_GRAYSCALE)
         label = self.labels[index]
-        bbox = self.bboxes[index]
 
         if self.transform is not None:
             image = self.transform(image)
-
-        if self.return_bbox:
-            return image, torch.FloatTensor(label), bbox
 
         return image, torch.FloatTensor(label)
 
