@@ -399,6 +399,9 @@ def main():
 			del save_dict_global, save_dict_local
 			torch.cuda.empty_cache()
 
+			for op in config['optimizer']:
+				config['optimizer'][op]['lr'] /= 10
+
 		if 'SGD' in config['optimizer']:
 			optimizer = optim.SGD(Model.parameters(), **config['optimizer']['SGD'])
 		elif 'Adam' in config['optimizer']:
