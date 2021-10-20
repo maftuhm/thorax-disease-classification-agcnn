@@ -262,7 +262,7 @@
 		"max_batch" : {
 			"global" : 20,
 			"local" : 16,
-			"fusion": 10
+			"fusion": 4
 		},
 		"batch_size" : {
 			"global" : 80,

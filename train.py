@@ -146,9 +146,9 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 				draw_image = drawImage(images_draw['images'],
 										images_draw['targets'],
-										output.detach(),
-										output_patches['crop'].detach(),
-										output_patches['heatmap'].detach(),
+										output.detach().cpu(),
+										output_patches['crop'].detach().cpu(),
+										output_patches['heatmap'].detach().cpu(),
 										None,
 										output_patches['coordinate'])
 
@@ -488,6 +488,7 @@ def main():
 		torch.cuda.empty_cache()
 
 		print(" Training " + branch_name + " branch done")
+		start_epoch = 0
 
 		print(" Training time {} branch: {}".format(branch_name, datetime.now() - start_time_train))
 
