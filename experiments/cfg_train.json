@@ -262,12 +262,12 @@
 		"max_batch" : {
 			"global" : 20,
 			"local" : 16,
-			"fusion": 4
+			"fusion": 6
 		},
 		"batch_size" : {
 			"global" : 80,
 			"local" : 80,
-			"fusion": 80
+			"fusion": 60
 		}
 	},
 	"agcnn16" : {

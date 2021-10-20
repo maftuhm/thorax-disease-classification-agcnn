@@ -128,7 +128,7 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 		# be careful add last layer with sigmoid if using bceloss or weighted bce loss
 		# and remove sigimoid(output) here
 		output = model(images)
-		loss = criterion(output, targets) / batch_multiplier
+		loss = criterion(output['score'], targets) / batch_multiplier
 		loss.backward()
 
 		if (i + 1) % batch_multiplier == 0:
@@ -210,10 +210,10 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 		# be careful add last layer with sigmoid if using bceloss or weighted bce loss
 		# and remove sigimoid(output) here
 		output = model(images)
-		loss = criterion(output, targets)
+		loss = criterion(output['score'], targets)
 		running_loss += loss.item()
 
-		pred = torch.cat((pred, output.detach().cpu()), 0)
+		pred = torch.cat((pred, output['score'].detach().cpu()), 0)
 
 		if i == random_int:
 			if branch == 'global':
@@ -485,7 +485,7 @@ def main():
 
 			print(" Training epoch time: {}\n".format(datetime.now() - start_time_epoch))
 
-		val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion['test'].to(device) if isinstance(criterion, dict) else criterion, TestModel)
+		# val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion['test'].to(device) if isinstance(criterion, dict) else criterion, TestModel)
 		del Model, TestModel, train_dataset, train_loader, val_dataset, val_loader, test_dataset, test_loader, criterion, optimizer
 		torch.cuda.empty_cache()
 
