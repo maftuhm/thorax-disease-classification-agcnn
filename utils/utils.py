@@ -191,11 +191,14 @@ def drawImage(images, target, scores, images_cropped = None, heatmaps = None, gt
 					image_drawed_bbox = draw_bounding_box(image_drawed_bbox, gt_coordinates[i], color=(255, 0, 0))
 
 			img = torch.cat((img, image_drawed_bbox), 0)
-			image_drawed_bbox =  draw_bounding_box(draw_heatmap(unnormalize(images[i]), heatmaps[i]), coordinates[i])
+			image_drawed_bbox =  draw_bounding_box(draw_heatmap(image_drawed_bbox, heatmaps[i]).squeeze(), coordinates[i])
 			img_heatmap = torch.cat((img_heatmap, image_drawed_bbox), 0)
 			img_crop = torch.cat((img_crop, unnormalize(images_cropped[i]).unsqueeze(0)), 0)
 		else:
 			img = torch.cat((img, unnormalize(images[i]).unsqueeze(0)), 0)
+
+	if img.dim() == 3:
+		img = img.unsqueeze(1)
 
 	if img.shape[1] == 1:
 		img = img.repeat(1, 3, 1, 1)

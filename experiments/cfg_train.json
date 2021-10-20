@@ -260,27 +260,21 @@
 		"lr_scheduler" : "ReduceLROnPlateau",
 		"loss" : "BCELoss",
 		"max_batch" : {
-			"global" : 20
+			"global" : 20,
+			"local" : 16,
+			"fusion": 10
 		},
 		"batch_size" : {
-			"global" : 80
+			"global" : 80,
+			"local" : 80,
+			"fusion": 80
 		}
 	},
 	"agcnn16" : {
 		"NUM_EPOCH" : 25,
-		"net" : {
-			"backbone" : "resnet50",
-			"last_pool" : "max"
-		},
-		"branch" : ["global"],
-		"optimizer" : "SGD",
-		"lr_scheduler" : "ReduceLROnPlateau",
-		"loss" : "BCELoss",
-		"max_batch" : {
-			"global" : 20
-		},
-		"batch_size" : {
-			"global" : 80
-		}
+		"net" : "agcnn15",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L2",
+		"threshold" : 0.7
 	}
 }

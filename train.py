@@ -99,7 +99,7 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 	running_loss = 0.
 	len_data = len(data_loader)
-	random_int = int(torch.randint(0, len_data, (1,))[0])
+	random_int = torch.randint(0, len_data, (1,)).item()
 	print(" Display images on index", random_int)
 	batch_multiplier = config['batch_size'][branch] // MAX_BATCH_CAPACITY[branch]
 
@@ -149,6 +149,7 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 										output.detach(),
 										output_patches['crop'].detach(),
 										output_patches['heatmap'].detach(),
+										None,
 										output_patches['coordinate'])
 
 			writer.add_images("train/{}".format(branch), draw_image, epoch)
@@ -186,7 +187,7 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 
 	running_loss = 0.
 	len_data = len(data_loader)
-	random_int = int(torch.randint(0, len_data, (1,))[0])
+	random_int = torch.randint(0, len_data, (1,)).item()
 	print(" Display images on index", random_int)
 
 	progressbar = tqdm(range(len_data))
@@ -228,6 +229,7 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 										output.detach(),
 										output_patches['crop'].detach(),
 										output_patches['heatmap'].detach(),
+										None,
 										output_patches['coordinate'])
 
 			writer.add_images("val/{}".format(branch), draw_image, epoch)
@@ -429,8 +431,8 @@ def main():
 
 				del save_dict
 				torch.cuda.empty_cache()
-			else:
-				raise Exception("checkpoint model does not exist")
+			#else:
+			#	raise Exception("checkpoint model does not exist")
 
 			checkpoint_best_auroc = path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_auroc.pth')
 			checkpoint_best_loss = path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_loss.pth')

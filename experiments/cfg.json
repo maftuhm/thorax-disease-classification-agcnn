@@ -33,7 +33,6 @@
 			"mode" : "max", 
 			"patience" : 2,
 			"factor" : 0.1,
-			"threshold" : 0.01,
 			"verbose" : true
 		}
 	},

@@ -46,7 +46,7 @@ def MainNet(last_pool = 'lse', lse_pool_controller = 5,
 class FusionNet(nn.Module):
     def __init__(self, threshold, distance_function, last_pool = 'lse', lse_pool_controller = 5, 
                 backbone = 'resnet50', pretrained = True, 
-                num_classes = 14, group_norm = False, **kwargs):
+                num_classes = 14, group_norm = False, add_layer = False, **kwargs):
 
         super(FusionNet, self).__init__()
 
@@ -93,7 +93,7 @@ class FusionNet(nn.Module):
     def forward(self, img):
         _, global_features, global_pool = self.global_net(img)
         out_patches = self.attention_mask(img, global_features.cpu())
-        _, _, local_pool = self.local_net(out_patches['out'])
+        _, _, local_pool = self.local_net(out_patches['crop'])
         fusion = torch.cat((global_pool, local_pool), dim = 1).to(img.device)
         out = self.fc(fusion)
 
