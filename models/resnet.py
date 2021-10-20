@@ -231,7 +231,13 @@ class ResNet(nn.Module):
         x = self.fc(flatten_pool)
         x = torch.sigmoid(x)
 
-        return x, features, flatten_pool
+        result = {
+            'score': x,
+            'features': features,
+            'flat_pool': flatten_pool
+        }
+
+        return result
 
     def forward(self, x):
         return self._forward_impl(x)
@@ -276,6 +282,7 @@ def ResNet50(pretrained = True, num_classes = 14, is_grayscale = True, last_pool
 
         model.load_state_dict(model_state_dict)
         del loaded_state_dict, model_state_dict
+        torch.cuda.empty_cache()
         print(" State dict is loaded")
 
     return model

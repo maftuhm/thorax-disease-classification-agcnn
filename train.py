@@ -118,16 +118,16 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		if branch == 'local':
 			with torch.no_grad():
-				_, global_features, _ = test_model['global'](images.to(device))
-				output_patches = test_model['attention'](images.detach(), global_features.detach().cpu())
-				images = output_patches['crop']
+				output = test_model['global'](images.to(device))
+				output_patches = test_model['attention'](images.detach(), output['features'].detach().cpu())
+				images = output_patches['image']
 
 		images = images.to(device, non_blocking=True)
 		targets = targets.to(device, non_blocking=True)
 
 		# be careful add last layer with sigmoid if using bceloss or weighted bce loss
 		# and remove sigimoid(output) here
-		output, _, output1 = model(images)
+		output = model(images)
 		loss = criterion(output, targets) / batch_multiplier
 		loss.backward()
 
@@ -138,16 +138,16 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		if i == random_int:
 			if branch == 'global':
-				draw_image = drawImage(images_draw['images'], images_draw['targets'], output.detach())
+				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['score'].detach())
 			else:
 
 				if branch == 'fusion':
-					output_patches = output1
+					output_patches = output['patch']
 
 				draw_image = drawImage(images_draw['images'],
 										images_draw['targets'],
-										output.detach().cpu(),
-										output_patches['crop'].detach().cpu(),
+										output['score'].detach().cpu(),
+										output_patches['image'].detach().cpu(),
 										output_patches['heatmap'].detach().cpu(),
 										None,
 										output_patches['coordinate'])
@@ -199,10 +199,9 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 			images_draw['targets'] = targets.detach()
 
 		if branch == 'local':
-			_, global_features, _ = test_model['global'](images.to(device))
-			output_patches = test_model['attention'](images.detach(), global_features.detach().cpu())
-			images = output_patches['crop']
-
+			output = test_model['global'](images.to(device))
+			output_patches = test_model['attention'](images.detach(), output['features'].detach().cpu())
+			images = output_patches['image']
 
 		images = images.to(device)
 		targets = targets.to(device)
@@ -210,7 +209,7 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 
 		# be careful add last layer with sigmoid if using bceloss or weighted bce loss
 		# and remove sigimoid(output) here
-		output, _, output1 = model(images)
+		output = model(images)
 		loss = criterion(output, targets)
 		running_loss += loss.item()
 
@@ -218,17 +217,17 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 
 		if i == random_int:
 			if branch == 'global':
-				draw_image = drawImage(images_draw['images'], images_draw['targets'], output.detach())
+				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['score'].detach())
 			else:
 
 				if branch == 'fusion':
-					output_patches = output1
+					output_patches = output['patch']
 
 				draw_image = drawImage(images_draw['images'],
 										images_draw['targets'],
-										output.detach(),
-										output_patches['crop'].detach(),
-										output_patches['heatmap'].detach(),
+										output['score'].detach(),
+										output_patches['image'].detach().cpu(),
+										output_patches['heatmap'].detach().cpu(),
 										None,
 										output_patches['coordinate'])
 
@@ -386,7 +385,7 @@ def main():
 			# for param in LocalModel.parameters():
 			# 	param.requires_grad = False
 
-			FusionModel.load_main_weights(save_dict_global['net'], save_dict_local['net'])
+			FusionModel.load_branch_weight(save_dict_global['net'], save_dict_local['net'])
 
 			Model = FusionModel.to(device)
 			TestModel = None

@@ -214,7 +214,14 @@ class DenseNet(nn.Module):
         flatten_pool = torch.flatten(out, 1)
         out = self.classifier(flatten_pool)
         out = torch.sigmoid(out)
-        return out, features, flatten_pool
+
+        result = {
+            'score': x,
+            'features': features,
+            'flat_pool': flatten_pool
+        }
+
+        return result
 
 def DenseNet121(pretrained = True, num_classes = 14, is_grayscale = True, last_pool = 'lse', lse_pool_controller = 10, **kwargs):
     model = DenseNet(growth_rate = 32, block_config = (6, 12, 24, 16),
@@ -250,6 +257,7 @@ def DenseNet121(pretrained = True, num_classes = 14, is_grayscale = True, last_p
 
         model.load_state_dict(state_dict)
         del state_dict
+        torch.cuda.empty_cache()
         print(" State dict is loaded")
 
     return model

@@ -45,8 +45,7 @@ def MainNet(last_pool = 'lse', lse_pool_controller = 5,
 
 class FusionNet(nn.Module):
     def __init__(self, threshold, distance_function, last_pool = 'lse', lse_pool_controller = 5, 
-                backbone = 'resnet50', pretrained = True, 
-                num_classes = 14, group_norm = False, add_layer = False, **kwargs):
+                backbone = 'resnet50', num_classes = 14, group_norm = False, add_layer = False, **kwargs):
 
         super(FusionNet, self).__init__()
 
@@ -88,13 +87,16 @@ class FusionNet(nn.Module):
         else:
             self.fc = nn.Linear(len_input * 2, num_classes)
 
-        self.sigmoid = nn.Sigmoid()
-
     def forward(self, img):
-        _, global_features, global_pool = self.global_net(img)
+        global_features = self.global_features(img)
+        global_pool = self.global_pool(global_features)
+
         out_patches = self.attention_mask(img, global_features.cpu())
-        _, _, local_pool = self.local_net(out_patches['crop'])
+
+        local_pool = self.local_pool(out_patches['image'])
+
         fusion = torch.cat((global_pool, local_pool), dim = 1).to(img.device)
+
         out = self.fc(fusion)
 
         if self.add_layer:
@@ -105,10 +107,31 @@ class FusionNet(nn.Module):
             out = self.relu(out)
             out = self.fc3(out)
 
-        out = self.sigmoid(out)
+        out = torch.sigmoid(out)
 
-        return out, out, out_patches
+        result = {
+            'score': out,
+            'patch': out_patches
+        }
 
-    def load_main_weights(self, global_weight, local_weight):
+        return result
+
+    def load_branch_weight(self, global_weight, local_weight):
         self.global_net.load_state_dict(global_weight)
         self.local_net.load_state_dict(local_weight)
+        self.reconstruct_branch()
+
+    def reconstruct_branch(self):
+        global_net = list(self.global_net.children())
+        self.global_features = nn.Sequential(*global_net[:-2])
+        self.global_pool = global_net[-2]
+
+        local_net = list(self.local_net.children())
+        self.local_pool = nn.Sequential(*local_net[:-1])
+
+        del self.global_net, self.local_net
+        torch.cuda.empty_cache()
+
+    def load_state_dict(self, state_dict, strict = True):
+        self.reconstruct_branch()
+        return super().load_state_dict(state_dict, strict=strict)

@@ -74,12 +74,12 @@ class AttentionMaskInference:
         heatmap = (out_heatmap > self.threshold).float()
         out, coords = self.crop_resize(x, heatmap)
 
-        output = {
-            'crop' : out,
+        result = {
+            'image' : out,
             'heatmap' : out_heatmap,
             'coordinate' : coords
         }
-        return output
+        return result
     
     def crop_resize(self, images, heatmaps):
 
