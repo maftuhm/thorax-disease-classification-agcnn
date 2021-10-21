@@ -90,10 +90,10 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 	model.train()
 
-	# if test_model is not None:
-	# 	for key in test_model:
-	# 		if key != 'attention':
-	# 			test_model[key].train()
+	if test_model is not None:
+		for key in test_model:
+			if key != 'attention':
+				test_model[key].train()
 
 	optimizer.zero_grad()
 
@@ -185,10 +185,10 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 
 	model.eval()
 
-	# if test_model is not None:
-	# 	for key in test_model:
-	# 		if key != 'attention':
-	# 			test_model[key].eval()
+	if test_model is not None:
+		for key in test_model:
+			if key != 'attention':
+				test_model[key].eval()
 	
 	gt = torch.FloatTensor()
 	pred = torch.FloatTensor()
@@ -305,15 +305,15 @@ def main():
 	   transforms.RandomResizedCrop(tuple(config['dataset']['crop']), (0.25, 1.0)),
 	   transforms.RandomHorizontalFlip(),
 	   transforms.ToTensor(),
-	   # transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
-	   transforms.DynamicNormalize()
+	   transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
+	   # transforms.DynamicNormalize()
 	)
 
 	transform_test = transforms.Compose(
 	   transforms.CenterCrop(tuple(config['dataset']['crop'])),
 	   transforms.ToTensor(),
-	   # transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
-	   transforms.DynamicNormalize()
+	   transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
+	   # transforms.DynamicNormalize()
 	)
 
 	if args.resume:
@@ -327,11 +327,10 @@ def main():
 	if 'local' in config['branch']:
 		print(" Local branch")
 		LocalModel = MainNet(num_classes = NUM_CLASSES, **config['net'])
-		AttentionGenPatchs = AttentionMaskInference(threshold = config['threshold'], distance_function = config['L_function'])
-		print(" L distance function \t:", config['L_function'])
-		print(" Threshold \t\t:", config['threshold'])
 		FusionModel = FusionNet(threshold = config['threshold'], distance_function = config['L_function'], num_classes = NUM_CLASSES, **config['net'])
-
+	AttentionGenPatchs = AttentionMaskInference(threshold = config['threshold'], distance_function = config['L_function'])
+	print(" L distance function \t:", config['L_function'])
+	print(" Threshold \t\t:", config['threshold'])
 	print(" Num classes \t\t:", NUM_CLASSES)
 	print(" Optimizer \t\t:", list(config['optimizer'].keys())[0])
 	print(" Lr Scheduler \t\t:", list(config['lr_scheduler'].keys())[0])
@@ -390,9 +389,9 @@ def main():
 				'attention': AttentionGenPatchs
 			}
 
-			for key in TestModel: 
-				if key != 'attention':
-					TestModel[key].eval()
+			# for key in TestModel: 
+			# 	if key != 'attention':
+			# 		TestModel[key].eval()
 
 			del save_dict_global
 			torch.cuda.empty_cache()
@@ -420,9 +419,9 @@ def main():
 				'local' : LocalModel.to(device)
 			}
 
-			for key in TestModel: 
-				if key != 'attention':
-					TestModel[key].eval()
+			# for key in TestModel: 
+			# 	if key != 'attention':
+			# 		TestModel[key].eval()
 
 			del save_dict_global, save_dict_local
 			torch.cuda.empty_cache()

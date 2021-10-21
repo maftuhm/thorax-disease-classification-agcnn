@@ -18,7 +18,7 @@ def MainNet(backbone = 'resnet50', **kwargs):
 
     print(" Backbone \t\t:", backbone)
     print(" Last pooling layer\t:", kwargs.get('last_pool'))
-    print(" Pretrained model \t:", kwargs.get('pretrained'))
+    print(" Pretrained model \t:", kwargs.get('pretrained', True))
     if kwargs.get('last_pool') == 'lse':
         print(" lse pooling controller :", kwargs.get('lse_pool_controller'))
         # print(" Group normalization \t:", group_norm)

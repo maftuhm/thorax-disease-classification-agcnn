@@ -56,11 +56,11 @@ class AttentionMaskInference:
     def __init__(self, threshold = 0.7, distance_function = "Lmax", size = (224, 224), mode = 'bilinear'):
 
         if distance_function == "Lmax":
-            self.distance = lambda x: normalize01(Lmax(x, 1))
+            self.distance = lambda x: Lmax(x, 1)
         elif distance_function == "L1":
-            self.distance = lambda x: normalize01(L1(x, 1))
+            self.distance = lambda x: L1(x, 1)
         elif distance_function == "L2":
-            self.distance = lambda x: normalize01(L2(x, 1))
+            self.distance = lambda x: L2(x, 1)
         else:
             raise Exception("distance function must be L1, L2 or Lmax")
 
