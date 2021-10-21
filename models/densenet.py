@@ -218,7 +218,7 @@ class DenseNet(nn.Module):
         result = {
             'score': x,
             'features': features,
-            'flat_pool': flatten_pool
+            'pool': flatten_pool
         }
 
         return result

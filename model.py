@@ -27,22 +27,15 @@ def MainNet(backbone = 'resnet50', **kwargs):
 
 
 class FusionNet(nn.Module):
-    def __init__(self, threshold, distance_function, add_layer = False, **kwargs):
+    def __init__(self, **kwargs):
 
         super(FusionNet, self).__init__()
 
         # ----------------- Backbone -----------------
 
-        self.global_net = MainNet(**kwargs)
-
-        self.local_net = MainNet(**kwargs)
-
-        self.attention_mask = AttentionMaskInference(threshold, distance_function)
-
-        self.add_layer = add_layer
-
         backbone = kwargs.get('backbone', 'resnet50')
         num_classes = kwargs.get('num_classes', 14)
+        add_layer = kwargs.get('add_layer', False)
 
         if backbone == 'resnet50':
             len_input = 2048
@@ -60,17 +53,8 @@ class FusionNet(nn.Module):
         else:
             self.fc = nn.Linear(len_input * 2, num_classes)
 
-    def forward(self, img):
-        global_features = self.global_features(img)
-        global_pool = self.global_pool(global_features).flatten(1)
-
-        out_patches = self.attention_mask(img, global_features.cpu())
-
-        local_pool = self.local_pool(out_patches['image']).flatten(1)
-
-        fusion = torch.cat((global_pool, local_pool), dim = 1).to(img.device)
-
-        out = self.fc(fusion)
+    def forward(self, pool):
+        out = self.fc(pool)
 
         if self.add_layer:
             out = self.relu(out)
@@ -83,8 +67,7 @@ class FusionNet(nn.Module):
         out = torch.sigmoid(out)
 
         result = {
-            'score': out,
-            'patch': out_patches
+            'score': out
         }
 
         return result

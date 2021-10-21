@@ -90,10 +90,10 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 	model.train()
 
-	if test_model is not None:
-		for key in test_model:
-			if key != 'attention':
-				test_model[key].train()
+	# if test_model is not None:
+	# 	for key in test_model:
+	# 		if key != 'attention':
+	# 			test_model[key].train()
 
 	optimizer.zero_grad()
 
@@ -118,9 +118,21 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		if branch == 'local':
 			with torch.no_grad():
-				output = test_model['global'](images.to(device))
-				output_patches = test_model['attention'](images.detach(), output['features'].detach().cpu())
+				output_global = test_model['global'](images.to(device))
+				output_patches = test_model['attention'](images.detach(), output_global['features'].detach().cpu())
 				images = output_patches['image']
+				del output_global
+				torch.cuda.empty_cache()
+
+		elif branch == 'fusion':
+			with torch.no_grad():
+				output_global = test_model['global'](images.to(device))
+				output_patches = test_model['attention'](images.detach(), output_global['features'].detach().cpu())
+				output_local = test_model['local'](output_patches['image'].to(device))
+				images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
+
+				del output_global, output_local
+				torch.cuda.empty_cache()
 
 		images = images.to(device, non_blocking=True)
 		targets = targets.to(device, non_blocking=True)
@@ -138,19 +150,15 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 		if i == random_int:
 			if branch == 'global':
-				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['score'].detach())
-			else:
+				output_patches = test_model['attention'](images_draw['images'], output['features'].detach().cpu())
 
-				if branch == 'fusion':
-					output_patches = output['patch']
-
-				draw_image = drawImage(images_draw['images'],
-										images_draw['targets'],
-										output['score'].detach().cpu(),
-										output_patches['image'].detach().cpu(),
-										output_patches['heatmap'].detach().cpu(),
-										None,
-										output_patches['coordinate'])
+			draw_image = drawImage(images_draw['images'],
+									images_draw['targets'],
+									output['score'].detach().cpu(),
+									output_patches['image'].detach().cpu(),
+									output_patches['heatmap'].detach().cpu(),
+									None,
+									output_patches['coordinate'])
 
 			writer.add_images("train/{}".format(branch), draw_image, epoch)
 
@@ -177,10 +185,10 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 
 	model.eval()
 
-	if test_model is not None:
-		for key in test_model:
-			if key != 'attention':
-				test_model[key].eval()
+	# if test_model is not None:
+	# 	for key in test_model:
+	# 		if key != 'attention':
+	# 			test_model[key].eval()
 	
 	gt = torch.FloatTensor()
 	pred = torch.FloatTensor()
@@ -199,9 +207,21 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 			images_draw['targets'] = targets.detach()
 
 		if branch == 'local':
-			output = test_model['global'](images.to(device))
-			output_patches = test_model['attention'](images.detach(), output['features'].detach().cpu())
+			output_global = test_model['global'](images.to(device))
+			output_patches = test_model['attention'](images.detach(), output_global['features'].detach().cpu())
 			images = output_patches['image']
+
+			del output_global
+			torch.cuda.empty_cache()
+
+		elif branch == 'fusion':
+			output_global = test_model['global'](images.to(device))
+			output_patches = test_model['attention'](images.detach(), output_global['features'].detach().cpu())
+			output_local = test_model['local'](output_patches['image'].to(device))
+			images = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
+
+			del output_global, output_local
+			torch.cuda.empty_cache()
 
 		images = images.to(device)
 		targets = targets.to(device)
@@ -216,20 +236,17 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 		pred = torch.cat((pred, output['score'].detach().cpu()), 0)
 
 		if i == random_int:
+
 			if branch == 'global':
-				draw_image = drawImage(images_draw['images'], images_draw['targets'], output['score'].detach())
-			else:
+				output_patches = test_model['attention'](images_draw['images'], output['features'].detach().cpu())
 
-				if branch == 'fusion':
-					output_patches = output['patch']
-
-				draw_image = drawImage(images_draw['images'],
-										images_draw['targets'],
-										output['score'].detach(),
-										output_patches['image'].detach().cpu(),
-										output_patches['heatmap'].detach().cpu(),
-										None,
-										output_patches['coordinate'])
+			draw_image = drawImage(images_draw['images'],
+									images_draw['targets'],
+									output['score'].detach(),
+									output_patches['image'].detach().cpu(),
+									output_patches['heatmap'].detach().cpu(),
+									None,
+									output_patches['coordinate'])
 
 			writer.add_images("val/{}".format(branch), draw_image, epoch)
 			del images_draw, draw_image
@@ -244,7 +261,10 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 	writer.add_scalars("val/loss", {branch: epoch_loss}, epoch)
 
 	AUROCs = compute_AUCs(gt, pred)
-	AUROCs_mean = np.array(AUROCs).mean()
+	if len(CLASS_NAMES) > 14:
+		AUROCs_mean = np.array(AUROCs)[:14].mean()
+	else:
+		AUROCs_mean = np.array(AUROCs).mean()
 
 	writer.add_scalars("val/AUROCs", {branch: AUROCs_mean}, epoch)
 
@@ -326,10 +346,10 @@ def main():
 		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 5, pin_memory = True, drop_last=True)
 
 		val_dataset = ChestXrayDataSet(DATA_DIR, 'val', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		val_loader = DataLoader(dataset = val_dataset, batch_size = 90, shuffle = False, num_workers = 5, pin_memory = False)
+		val_loader = DataLoader(dataset = val_dataset, batch_size = 96, shuffle = False, num_workers = 5, pin_memory = False)
 
 		test_dataset = ChestXrayDataSet(DATA_DIR, 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		test_loader = DataLoader(dataset = test_dataset, batch_size = 90, shuffle = False, num_workers = 5, pin_memory = False)
+		test_loader = DataLoader(dataset = test_dataset, batch_size = 96, shuffle = False, num_workers = 5, pin_memory = False)
 
 		if config['loss'] == 'BCELoss':
 			criterion = nn.BCELoss()
@@ -353,7 +373,9 @@ def main():
 	
 		if branch_name == 'global':
 			Model = GlobalModel.to(device)
-			TestModel = None
+			TestModel = {
+				'attention': AttentionGenPatchs
+			}
 
 		if branch_name == 'local':
 			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_auroc' + '.pth'))
@@ -367,8 +389,11 @@ def main():
 				'global' : GlobalModel.to(device),
 				'attention': AttentionGenPatchs
 			}
-			# TestModel['attention'].eval()
-			# for key in TestModel: TestModel[key].eval()
+
+			for key in TestModel: 
+				if key != 'attention':
+					TestModel[key].eval()
+
 			del save_dict_global
 			torch.cuda.empty_cache()
 
@@ -376,8 +401,8 @@ def main():
 			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_auroc' + '.pth'), map_location='cpu')
 			save_dict_local = torch.load(os.path.join(exp_dir_num, args.exp_num + '_local_best_auroc' + '.pth'), map_location='cpu')
 
-			# GlobalModel.load_state_dict(save_dict_global['net'])
-			# LocalModel.load_state_dict(save_dict_local['net'])
+			GlobalModel.load_state_dict(save_dict_global['net'])
+			LocalModel.load_state_dict(save_dict_local['net'])
 
 			# for param in GlobalModel.parameters():
 			# 	param.requires_grad = False
@@ -385,22 +410,25 @@ def main():
 			# for param in LocalModel.parameters():
 			# 	param.requires_grad = False
 
-			FusionModel.load_branch_weight(save_dict_global['net'], save_dict_local['net'])
+			# FusionModel.load_branch_weight(save_dict_global['net'], save_dict_local['net'])
 
 			Model = FusionModel.to(device)
 			TestModel = None
-			# TestModel = {
-			# 	'global' : GlobalModel.to(device), 
-			# 	'attention' : AttentionGenPatchs, 
-			# 	'local' : LocalModel.to(device)
-			# }
-			# TestModel['attention'].eval()
-			# for key in TestModel: TestModel[key].eval()
+			TestModel = {
+				'global' : GlobalModel.to(device), 
+				'attention' : AttentionGenPatchs, 
+				'local' : LocalModel.to(device)
+			}
+
+			for key in TestModel: 
+				if key != 'attention':
+					TestModel[key].eval()
+
 			del save_dict_global, save_dict_local
 			torch.cuda.empty_cache()
 
-			for op in config['optimizer']:
-				config['optimizer'][op]['lr'] /= 10
+			# for op in config['optimizer']:
+			# 	config['optimizer'][op]['lr'] /= 10
 
 		if 'SGD' in config['optimizer']:
 			optimizer = optim.SGD(Model.parameters(), **config['optimizer']['SGD'])
