@@ -278,7 +278,7 @@
 		"threshold" : 0.7
 	},
 	"agcnn17" : {
-		"NUM_EPOCH" : 25,
+		"NUM_EPOCH" : 30,
 		"num_classes" : 15,
 		"net" : {
 			"backbone" : "resnet50",
@@ -288,7 +288,7 @@
 		"optimizer" : "SGD",
 		"lr_scheduler" : "ReduceLROnPlateau",
 		"loss" : "BCELoss",
-		"L_function" : "Lmax",
+		"L_function" : "L2",
 		"threshold" : 0.7,
 		"max_batch" : {
 			"global" : 20,

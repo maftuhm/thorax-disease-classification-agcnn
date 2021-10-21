@@ -155,22 +155,22 @@ def main():
 	start_time_test = datetime.now()
 	for i, (image, target) in enumerate(test_loader):
 		# compute output
-		output_global, _, _ = GlobalModel(image.to(device))
+		output_global = GlobalModel(image.to(device))
 
 		if args.branch == 'all':
 			output_patches = AttentionGenPatchs(image.detach(), output_global['features'].detach().cpu())
 
-			output_local = LocalModel(output_patches['crop'].to(device))
+			output_local = LocalModel(output_patches['image'].to(device))
 
 			pool = torch.cat((output_global['pool'], output_local['pool']), dim = 1)
 			output_fusion = FusionModel(pool.to(device))
 
 		ground_truth = torch.cat((ground_truth, target.detach()), 0)
-		pred_global = torch.cat((pred_global.detach(), output_global.detach().cpu()), 0)
+		pred_global = torch.cat((pred_global.detach(), output_global['score'].detach().cpu()), 0)
 
 		if args.branch == 'all':
-			pred_local = torch.cat((pred_local.detach(), output_local['out'].detach().cpu()), 0)
-			pred_fusion = torch.cat((pred_fusion.detach(), output_fusion['out'].detach().cpu()), 0)
+			pred_local = torch.cat((pred_local.detach(), output_local['score'].detach().cpu()), 0)
+			pred_fusion = torch.cat((pred_fusion.detach(), output_fusion['score'].detach().cpu()), 0)
 
 		# if (i + 1) % 300 == 0:
 		# 	draw_image = drawImage(image, target, output_fusion.detach().cpu(), image_patch.detach(), heatmaps, coordinates)
