@@ -305,15 +305,15 @@ def main():
 	   transforms.RandomResizedCrop(tuple(config['dataset']['crop']), (0.5, 1.0)),
 	   transforms.RandomHorizontalFlip(),
 	   transforms.ToTensor(),
-	   transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
-	   # transforms.DynamicNormalize()
+	   # transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
+	   transforms.DynamicNormalize()
 	)
 
 	transform_test = transforms.Compose(
 	   transforms.CenterCrop(tuple(config['dataset']['crop'])),
 	   transforms.ToTensor(),
-	   transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
-	   # transforms.DynamicNormalize()
+	   # transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
+	   transforms.DynamicNormalize()
 	)
 
 	if args.resume:

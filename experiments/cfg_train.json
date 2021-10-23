@@ -293,12 +293,53 @@
 		"max_batch" : {
 			"global" : 20,
 			"local" : 16,
-			"fusion": 16
+			"fusion": 64
 		},
 		"batch_size" : {
 			"global" : 80,
 			"local" : 64,
 			"fusion": 64
 		}
+	},
+	"agcnn18" : {
+		"net" : "agcnn17",
+		"NUM_EPOCH" : 30,
+		"num_classes" : 15,
+		"branch" : ["local", "fusion"],
+		"L_function" : "L2",
+		"threshold" : 0.7
+	},
+	"__comment1920__": "with modified dynamic normalize",
+	"agcnn19" : {
+		"NUM_EPOCH" : 30,
+		"num_classes" : 15,
+		"net" : {
+			"backbone" : "resnet50",
+			"last_pool" : "max"
+		},
+		"branch" : ["global"],
+		"optimizer" : "SGD",
+		"lr_scheduler" : "ReduceLROnPlateau",
+		"loss" : "BCELoss",
+		"L_function" : "L2",
+		"threshold" : 0.7,
+		"max_batch" : {
+			"global" : 20,
+			"local" : 16,
+			"fusion": 64
+		},
+		"batch_size" : {
+			"global" : 80,
+			"local" : 64,
+			"fusion": 64
+		}
+	},
+	"agcnn20" : {
+		"net" : "agcnn17",
+		"NUM_EPOCH" : 30,
+		"num_classes" : 15,
+		"branch" : ["local", "fusion"],
+		"L_function" : "L2",
+		"threshold" : 0.7
 	}
 }
