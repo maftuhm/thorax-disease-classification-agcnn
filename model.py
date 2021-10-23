@@ -35,7 +35,7 @@ class FusionNet(nn.Module):
 
         backbone = kwargs.get('backbone', 'resnet50')
         num_classes = kwargs.get('num_classes', 14)
-        add_layer = kwargs.get('add_layer', False)
+        self.add_layer = kwargs.get('add_layer', False)
 
         if backbone == 'resnet50':
             len_input = 2048
@@ -44,7 +44,7 @@ class FusionNet(nn.Module):
         else:
             raise Exception("backbone must be resnet50 or densenet121")
 
-        if add_layer:
+        if self.add_layer:
             self.fc = nn.Linear(len_input * 2, len_input // 2)
             self.fc1 = nn.Linear(len_input // 2, len_input // 4)
             self.fc2 = nn.Linear(len_input // 4, len_input // 8)
@@ -90,6 +90,6 @@ class FusionNet(nn.Module):
         torch.cuda.empty_cache()
         print(" Global and Local model have been reconstructed.")
 
-    def load_state_dict(self, state_dict, strict = True):
-        self.reconstruct_branch()
-        return super().load_state_dict(state_dict, strict=strict)
+    # def load_state_dict(self, state_dict, strict = True):
+    #     self.reconstruct_branch()
+    #     return super().load_state_dict(state_dict, strict=strict)
