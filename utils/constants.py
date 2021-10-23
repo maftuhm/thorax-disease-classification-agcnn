@@ -1,24 +1,4 @@
-from collections import namedtuple
-
 from enum import Enum, auto
-
-# class Branch(str, Enum):
-#     _global = 'global'
-#     local = 'local'
-#     fusion = 'fusion'
-
-# class Backbone(str, Enum):
-#     resnet50 = 'resnet50'
-#     densenet121 = 'densenet121'
-#     resnet101 = 'resnet101'
-
-# class LastPool(str, Enum):
-#     max = 'max'
-#     avg = 'avg'
-#     lse = 'lse'
-#     adaptive_avg = 'adaptive_avg'
-
-# Branch = namedtuple('Branch', ['_global', 'local', 'fusion'])(0, 1, 2)
 
 class StrEnum(str, Enum):
     def _generate_next_value_(name, start, count, last_values):
@@ -33,12 +13,14 @@ class StrEnum(str, Enum):
     def equals(self, value):
        return self.value == value
 
+# C : Constants
 class C:
     # m : model
     class m(StrEnum):
         global_ = 'global'
         local = auto()
         fusion = auto()
+        att = 'attention'
     
     # b : backbone
     class b(StrEnum):
@@ -61,7 +43,8 @@ class C:
     # l : loss function
     class l(StrEnum):
         BCELoss = auto()
-        WBCELoss = auto()
+        WBCELoss = 'WeightedBCELoss'
+        BCELogitsLoss = 'BCEWithLogitsLoss'
 
     # ls : learning rate scheduler
     class ls(StrEnum):
@@ -74,6 +57,9 @@ class C:
         L2 = auto()
         Lmax = auto()
 
-# Backbone = StrEnum('Backbone', 'resnet50, densenet121, resnet101', qualname='SomeData.Backbone')
+class attrdict(dict):
+    def __getattr__(self, name):
+        return self[name]
 
-print(C.m.local)
+    def __setattr__(self, name, value):
+        self[name] = value
