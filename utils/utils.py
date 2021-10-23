@@ -50,6 +50,19 @@ def compute_AUCs(gt, pred):
 		AUROCs.append(roc_auc_score(gt_np[:, i], pred_np[:, i]))
 	return AUROCs
 
+def get_threshold(gt, pred):
+	gt_np = gt.cpu().numpy()
+	pred_np = pred.cpu().numpy()
+
+	results = []
+	for i in range(len(gt_np[0])):
+		fpr, tpr, thresholds = roc_curve(gt_np[:, i], pred_np[:, i])
+		gmeans = np.sqrt(tpr * (1-fpr))
+		ix = np.argmax(gmeans)
+		results.append(thresholds[ix])
+
+	return results
+
 def create_roc_curve(gt, pred):
 	gt_np = gt.cpu().numpy()
 	pred_np = pred.cpu().numpy()
@@ -231,3 +244,25 @@ def reduce_weight_bias(weight, bias, num_classes = 14):
 def get_weight_wbce_loss(labels):
 	count_labels = torch.FloatTensor(labels).sum(axis=0)
 	return (len(labels) / count_labels) - 1
+
+class Predict:
+	def __init__(self, model, threshold):
+		assert len(threshold) == len(self.num_classess), "len threshold must be the same with len num classes"
+		self.threshold = threshold
+		self.model = model
+		self.model.eval()
+		self.model.requires_grad_(False)
+
+	def predict_classes(self, x):
+
+		x = x.to(self.model.device)
+
+		out = self.model(x)
+		scores = out['score'].detach().cpu()
+
+		results = []
+		for score in scores:
+			class_predict = [i for i, (sc, th) in enumerate(zip(score, self.threshold)) if sc > th]
+			results.append(class_predict)
+		
+		return results
