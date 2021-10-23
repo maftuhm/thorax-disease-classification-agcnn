@@ -34,6 +34,11 @@
 			"patience" : 2,
 			"factor" : 0.1,
 			"verbose" : true
+		},
+		"CyclicLR" : {
+			"base_lr" : 0.005,
+			"max_lr" : 0.01,
+			"verbose" : true
 		}
 	},
 	"max_batch" : {

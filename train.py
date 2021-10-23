@@ -430,8 +430,10 @@ def main():
 			lr_scheduler = optim.lr_scheduler.StepLR(optimizer , **config.lr_scheduler.StepLR)
 		elif C.ls.ReduceLROnPlateau in config.lr_scheduler:
 			lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, **config.lr_scheduler.ReduceLROnPlateau)
+		elif C.ls.CyclicLR in config.lr_scheduler:
+			lr_scheduler = optim.lr_scheduler.CyclicLR(optimizer, **config.lr_scheduler.CyclicLR)
 		else:
-			raise Exception("lr_scheduler must be StepLR or ReduceLROnPlateau")
+			raise Exception("lr_scheduler must be StepLR, ReduceLROnPlateau or CyclicLR")
 
 		if args.resume:
 

@@ -50,6 +50,7 @@ class C:
     class ls(StrEnum):
         ReduceLROnPlateau = auto()
         StepLR = auto()
+        CyclicLR = auto()
 
     # lf : L function
     class lf(StrEnum):

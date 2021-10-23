@@ -341,5 +341,29 @@
 		"branch" : ["local", "fusion"],
 		"L_function" : "L2",
 		"threshold" : 0.7
+	},
+	"agcnn21" : {
+		"NUM_EPOCH" : 25,
+		"num_classes" : 15,
+		"net" : {
+			"backbone" : "resnet50",
+			"last_pool" : "max"
+		},
+		"branch" : ["global"],
+		"optimizer" : "SGD",
+		"lr_scheduler" : "CyclicLR",
+		"loss" : "BCELoss",
+		"L_function" : "L2",
+		"threshold" : 0.7,
+		"max_batch" : {
+			"global" : 20,
+			"local" : 20,
+			"fusion": 64
+		},
+		"batch_size" : {
+			"global" : 80,
+			"local" : 80,
+			"fusion": 64
+		}
 	}
 }
