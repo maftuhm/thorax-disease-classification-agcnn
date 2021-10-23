@@ -17,7 +17,7 @@
 			"weight_decay" : 0.0001
 		},
 		"Adam" : {
-			"lr": 0.001,
+			"lr": 0.01,
 			"betas": [0.9, 0.999], 
 			"eps": 1e-08, 
 			"weight_decay" : 0.0001
@@ -36,9 +36,10 @@
 			"verbose" : true
 		},
 		"CyclicLR" : {
-			"base_lr" : 0.001,
-			"max_lr" : 0.01,
-			"verbose" : true
+			"base_lr" : 0.006,
+			"max_lr" : 0.012,
+            "mode" : "exp_range",
+            "step_size_up": 1000
 		}
 	},
 	"max_batch" : {
