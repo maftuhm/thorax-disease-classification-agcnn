@@ -16,6 +16,7 @@ import torch.nn.functional as F
 import torchvision
 import torchvision.transforms as transforms_th
 from config import *
+from utils.attention_mask_inference import AttentionMaskInference
 
 def save_model(exp_dir, epoch, auroc, loss, model, optimizer, lr_scheduler, branch_name = 'global'):
 	save_dict = {
@@ -246,23 +247,68 @@ def get_weight_wbce_loss(labels):
 	return (len(labels) / count_labels) - 1
 
 class Predict:
-	def __init__(self, model, threshold):
-		assert len(threshold) == len(self.num_classess), "len threshold must be the same with len num classes"
+	def __init__(self, model, threshold = None, num_classes = 14, att_mask = None):
+		assert len(threshold) == num_classes, "len threshold must be the same with len num classes"
 		self.threshold = threshold
 		self.model = model
 		self.model.eval()
 		self.model.requires_grad_(False)
 
-	def predict_classes(self, x):
+		if att_mask is not None:
+			assert isinstance(att_mask, AttentionMaskInference)
+			self.attention_mask = att_mask
+		else:
+			self.attention_mask = AttentionMaskInference(threshold = 0.7, distance_function = 'L2')
 
+		self.results = None
+
+	def predict(self, x):
 		x = x.to(self.model.device)
+		self.results = self.model(x)
+		return self.results['score']
 
-		out = self.model(x)
-		scores = out['score'].detach().cpu()
-
-		results = []
+	def predict_classes_(self, x):
+		assert x is not None, "input x must be not None"
+		scores = self.predict(x)
+		classes_predicted = []
 		for score in scores:
 			class_predict = [i for i, (sc, th) in enumerate(zip(score, self.threshold)) if sc > th]
-			results.append(class_predict)
-		
-		return results
+			classes_predicted.append(class_predict)
+
+		return classes_predicted
+
+	def predict_classes(self, x = None, threshold = None):
+
+		if threshold is not None:
+			self.threshold = threshold
+
+		assert self.threshold is not None, "threshold must be not None."
+
+		if x is not None:
+			scores = self.predict(x)
+		else:
+			assert self.results is not None, "input x must be not None and model.predict(x) never be called."
+			scores = self.results['score']
+
+		classes_predicted = []
+		for score in scores:
+			class_predict = [i for i, (sc, th) in enumerate(zip(score, self.threshold)) if sc > th]
+			classes_predicted.append(class_predict)
+
+		return classes_predicted
+
+	def attention(self, x = None):
+
+		if x is not None:
+			self.predict(x)
+
+		assert self.results is not None, "input x must be not None and model.predict(x) never be called."
+		return self.attention_mask(x, self.results['features'])
+	
+	def features(self, x = None):
+		# cooming soon
+		pass
+
+	def __call__(self, img, target = None, bbox = None):
+		# cooming soon
+		pass
