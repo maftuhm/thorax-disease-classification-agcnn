@@ -58,11 +58,11 @@ if C.m.local in exp_config.branch:
 	else:
 		raise Exception("experiment number global branch must be choosen")
 
-config.optimizer = {exp_config.optimizer : config.optimizer[exp_config.optimizer]}
-del exp_config.optimizer
+config.optimizer = attrdict({exp_config.optimizer : config.optimizer[exp_config.optimizer]})
+del exp_config['optimizer']
 
-config.lr_scheduler = {exp_config.lr_scheduler : config.lr_scheduler[exp_config.lr_scheduler]}
-del exp_config.lr_scheduler
+config.lr_scheduler = attrdict({exp_config.lr_scheduler : config.lr_scheduler[exp_config.lr_scheduler]})
+del exp_config['lr_scheduler']
 
 config.update(exp_config)
 del exp_config, exp_configs
@@ -303,9 +303,9 @@ def main():
 	#    std=torch.tensor([[0.229, 0.224, 0.225]]).mean(1)
 	# )
 
-	transform_init = transforms.Resize(tuple(config.dataset.resize))
+	transform_init = transforms.Resize(tuple(config.dataset['resize']))
 	transform_train = transforms.Compose(
-	   transforms.RandomResizedCrop(tuple(config.dataset.crop), (0.5, 1.0)),
+	   transforms.RandomResizedCrop(tuple(config.dataset['crop']), (0.5, 1.0)),
 	   transforms.RandomHorizontalFlip(),
 	   transforms.ToTensor(),
 	   # transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
@@ -313,7 +313,7 @@ def main():
 	)
 
 	transform_test = transforms.Compose(
-	   transforms.CenterCrop(tuple(config.dataset.crop)),
+	   transforms.CenterCrop(tuple(config.dataset['crop'])),
 	   transforms.ToTensor(),
 	   # transforms.Normalize(mean=[0.49886124425113754], std=[0.22925289787072856])
 	   transforms.DynamicNormalize()
