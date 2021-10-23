@@ -16,6 +16,7 @@ import torch.nn.functional as F
 import torchvision
 import torchvision.transforms as transforms_th
 from config import *
+from utils import transforms as transforms_
 from utils.attention_mask_inference import AttentionMaskInference
 
 def save_model(exp_dir, epoch, auroc, loss, model, optimizer, lr_scheduler, branch_name = 'global'):
@@ -247,7 +248,7 @@ def get_weight_wbce_loss(labels):
 	return (len(labels) / count_labels) - 1
 
 class Predict:
-	def __init__(self, model, threshold = None, num_classes = 14, att_mask = None):
+	def __init__(self, model, transform = None, threshold = None, num_classes = 14, att_mask = None):
 		assert len(threshold) == num_classes, "len threshold must be the same with len num classes"
 		self.threshold = threshold
 		self.model = model
@@ -259,16 +260,29 @@ class Predict:
 			self.attention_mask = att_mask
 		else:
 			self.attention_mask = AttentionMaskInference(threshold = 0.7, distance_function = 'L2')
+		
+		if transform is not None:
+			self.transform = transform
+		else:
+			self.transform = transforms_.Compose(
+				transforms_.Resize((256, 256)),
+				transforms_.CenterCrop((224, 224)),
+				transforms_.DynamicNormalize()
+			)
 
 		self.results = None
 
 	def predict(self, x):
+		x = self.transform(x)
 		x = x.to(self.model.device)
 		self.results = self.model(x)
 		return self.results['score']
 
 	def predict_classes_(self, x):
 		assert x is not None, "input x must be not None"
+		assert self.threshold is not None, "threshold must be not None."
+
+		x = self.transform(x)
 		scores = self.predict(x)
 		classes_predicted = []
 		for score in scores:
@@ -285,6 +299,7 @@ class Predict:
 		assert self.threshold is not None, "threshold must be not None."
 
 		if x is not None:
+			x = self.transform(x)
 			scores = self.predict(x)
 		else:
 			assert self.results is not None, "input x must be not None and model.predict(x) never be called."
@@ -300,6 +315,7 @@ class Predict:
 	def attention(self, x = None):
 
 		if x is not None:
+			x = self.transform(x)
 			self.predict(x)
 
 		assert self.results is not None, "input x must be not None and model.predict(x) never be called."

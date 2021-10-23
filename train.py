@@ -149,9 +149,9 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 			optimizer.step()
 			optimizer.zero_grad()
 
-			if isinstance(lr_scheduler, optim.lr_scheduler.CyclicLR):
-				writer.add_scalars("train/CyclicLR", {branch: optimizer.param_groups[0]['lr']}, lr_scheduler.last_epoch + 1)
-				lr_scheduler.step()
+			# if isinstance(lr_scheduler, optim.lr_scheduler.CyclicLR):
+			# 	writer.add_scalars("train/CyclicLR", {branch: optimizer.param_groups[0]['lr']}, lr_scheduler.last_epoch + 1)
+			# 	lr_scheduler.step()
 
 			weight_last_updated = i + 1
 
