@@ -36,7 +36,7 @@
 			"verbose" : true
 		},
 		"CyclicLR" : {
-			"base_lr" : 0.005,
+			"base_lr" : 0.001,
 			"max_lr" : 0.01,
 			"verbose" : true
 		}

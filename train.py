@@ -148,6 +148,9 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 		if (i + 1) % batch_multiplier == 0:
 			optimizer.step()
 			optimizer.zero_grad()
+			if isinstance(lr_scheduler, optim.lr_scheduler.CyclicLR):
+				lr_scheduler.step()
+
 			weight_last_updated = i + 1
 
 		if i == random_int:
@@ -482,7 +485,7 @@ def main():
 				writer.add_scalars("val/distance_loss_auroc", {branch_name: distance_loss_auroc}, epoch)
 
 				lr_scheduler.step(distance_loss_auroc)
-			else:
+			elif isinstance(lr_scheduler, optim.lr_scheduler.StepLR):
 				lr_scheduler.step()
 
 			save_model(exp_dir_num, epoch, val_auroc, val_loss, Model, optimizer, lr_scheduler, branch_name)
