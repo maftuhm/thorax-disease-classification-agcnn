@@ -325,7 +325,7 @@
 		"threshold" : 0.7,
 		"max_batch" : {
 			"global" : 20,
-			"local" : 16,
+			"local" : 20,
 			"fusion": 64
 		},
 		"batch_size" : {

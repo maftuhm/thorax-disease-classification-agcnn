@@ -91,10 +91,10 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 	model.train()
 
-	if test_model is not None:
-		for key in test_model:
-			if key != C.m.att:
-				test_model[key].train()
+	# if test_model is not None:
+	# 	for key in test_model:
+	# 		if key != 'attention':
+	# 			test_model[key].train()
 
 	optimizer.zero_grad()
 
@@ -187,10 +187,10 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 
 	model.eval()
 
-	if test_model is not None:
-		for key in test_model:
-			if key != 'attention':
-				test_model[key].eval()
+	# if test_model is not None:
+	# 	for key in test_model:
+	# 		if key != 'attention':
+	# 			test_model[key].eval()
 	
 	gt = torch.FloatTensor()
 	pred = torch.FloatTensor()
@@ -382,9 +382,8 @@ def main():
 		if branch_name == C.m.local:
 			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_auroc' + '.pth'))
 			GlobalModel.load_state_dict(save_dict_global['net'])
-
-			for param in GlobalModel.parameters():
-				param.requires_grad = False
+			GlobalModel.eval()
+			GlobalModel.requires_grad_(False)
 
 			Model = LocalModel.to(device)
 			TestModel = attrdict({
@@ -392,27 +391,19 @@ def main():
 				C.m.att : AttentionGenPatchs
 			})
 
-			# for key in TestModel: 
-			# 	if key != 'attention':
-			# 		TestModel[key].eval()
-
 			del save_dict_global
 			torch.cuda.empty_cache()
 
 		if branch_name == C.m.local:
 			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_auroc' + '.pth'), map_location='cpu')
+			GlobalModel.load_state_dict(save_dict_global['net'])			
+			GlobalModel.eval()
+			GlobalModel.requires_grad_(False)
+
 			save_dict_local = torch.load(os.path.join(exp_dir_num, args.exp_num + '_local_best_auroc' + '.pth'), map_location='cpu')
-
-			GlobalModel.load_state_dict(save_dict_global['net'])
 			LocalModel.load_state_dict(save_dict_local['net'])
-
-			# for param in GlobalModel.parameters():
-			# 	param.requires_grad = False
-
-			# for param in LocalModel.parameters():
-			# 	param.requires_grad = False
-
-			# FusionModel.load_branch_weight(save_dict_global['net'], save_dict_local['net'])
+			LocalModel.eval()
+			LocalModel.requires_grad_(False)
 
 			Model = FusionModel.to(device)
 			TestModel = None
@@ -422,10 +413,6 @@ def main():
 				C.m.local : LocalModel.to(device)
 			})
 
-			# for key in TestModel: 
-			# 	if key != 'attention':
-			# 		TestModel[key].eval()
-
 			del save_dict_global, save_dict_local
 			torch.cuda.empty_cache()
 
@@ -434,7 +421,7 @@ def main():
 
 		if C.o.SGD in config.optimizer:
 			optimizer = optim.SGD(Model.parameters(), **config.optimizer.SGD)
-		elif C.o.Adam in config['optimizer']:
+		elif C.o.Adam in config.optimizer:
 			optimizer = optim.Adam(Model.parameters(), **config.optimizer.Adam)
 		else:
 			raise Exception("optimizer must be SGD or Adam")
@@ -463,8 +450,6 @@ def main():
 
 				del save_dict
 				torch.cuda.empty_cache()
-			#else:
-			#	raise Exception("checkpoint model does not exist")
 
 			checkpoint_best_auroc = path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_auroc.pth')
 			checkpoint_best_loss = path.join(exp_dir_num, args.exp_num + '_' + branch_name + '_best_loss.pth')
