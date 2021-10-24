@@ -63,7 +63,11 @@ if 'num_classes' in list(config.keys()):
 
 NUM_CLASSES = len(CLASS_NAMES)
 
-MAX_BATCH_CAPACITY = 120
+MAX_BATCH_CAPACITY = 64
+if MAX_BATCH_CAPACITY % 5 == 0:
+	num_workers = 5
+else:
+	num_workers = 4
 
 cudnn.benchmark = True
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -86,7 +90,7 @@ def main():
 	# ================= LOAD DATASET ================= #
 
 	test_dataset = ChestXrayDataSet(DATA_DIR, 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-	test_loader = DataLoader(dataset = test_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = False, num_workers = 0, pin_memory = True)
+	test_loader = DataLoader(dataset = test_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = False, num_workers = num_workers, pin_memory = True)
 
 	# ================= MODELS ================= #
 	GlobalModel = MainNet(pretrained = False, num_classes = NUM_CLASSES, **config['net']).to(device)
@@ -108,7 +112,7 @@ def main():
 
 	checkpoint_global = os.path.join(exp_dir_num, args.exp_num + '_global' + add_text + '.pth')
 	if args.branch == 'all':
-		checkpoint_global = os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global' + add_text + '.pth')
+		checkpoint_global = os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_auroc.pth')
 		checkpoint_local = os.path.join(exp_dir_num, args.exp_num + '_local' + add_text + '.pth')
 		checkpoint_fusion = os.path.join(exp_dir_num, args.exp_num + '_fusion' + add_text + '.pth')
 
@@ -116,6 +120,8 @@ def main():
 		save_dict = torch.load(checkpoint_global)
 		GlobalModel.load_state_dict(save_dict['net'])
 		print(" Loaded Global Branch Model checkpoint from epoch", save_dict['epoch'])
+		del save_dict
+		torch.cuda.empty_cache()
 	else:
 		raise Exception("Global Model does not exist")
 
@@ -124,6 +130,8 @@ def main():
 			save_dict = torch.load(checkpoint_local)
 			LocalModel.load_state_dict(save_dict['net'])
 			print(" Loaded Local Branch Model checkpoint from epoch", save_dict['epoch'])
+			del save_dict
+			torch.cuda.empty_cache()
 		else:
 			raise Exception("Local Model does not exist")
 
@@ -131,6 +139,8 @@ def main():
 			save_dict = torch.load(checkpoint_fusion)
 			FusionModel.load_state_dict(save_dict['net'])
 			print(" Loaded Fusion Branch Model checkpoint from epoch", save_dict['epoch'])
+			del save_dict
+			torch.cuda.empty_cache()
 		else:
 			raise Exception("Fusion Model does not exist")
 

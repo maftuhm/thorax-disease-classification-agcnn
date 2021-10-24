@@ -1,4 +1,5 @@
 import time
+import argparse
 from tqdm import tqdm
 from utils import ChestXrayDataSet
 from torch.utils.data import DataLoader
@@ -9,6 +10,19 @@ import torch
 import torch.backends.cudnn as cudnn
 cudnn.benchmark = True
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='AG-CNN')
+    parser.add_argument("--batch_size", type=int, default=20)
+    parser.add_argument("--pin_memory", "-pm", action="store_true")
+    parser.add_argument("--non_blocking", "-nb", action="store_true")
+    parser.add_argument("--start_nw", type=int, default=2)
+    parser.add_argument("--end_nw", type=int, default=8)
+    parser.add_argument("--data_split", type=str, default='val')
+    args = parser.parse_args()
+    return args
+
+args = parse_args()
+
 def loop(loader, non_blocking = False):
     for epoch in range(0, 3):
         progressbar = tqdm(range(len(loader)))
@@ -17,7 +31,8 @@ def loop(loader, non_blocking = False):
             labels = labels.to('cuda:0', non_blocking=non_blocking)
             progressbar.update(1)
         progressbar.close()
-    del loader
+    del loader, images, labels
+    torch.cuda.empty_cache()
 
 def main():
 
@@ -47,17 +62,16 @@ def main():
     best_time_loader = 1000.
     best_num_worker = -1
 
-    train_data = ChestXrayDataSet(DATA_DIR, 'train', num_classes = 14, transform = transform_train, init_transform=transform_init)
+    train_data = ChestXrayDataSet(DATA_DIR, args.data_split, num_classes = 15, transform = transform_train, init_transform=transform_init)
     # val_data = ChestXrayDataSet(data_dir = DATA_DIR, split = 'val', num_classes = 14, transform = transform_test, init_transform=transform_init)
-    pin_memory = True
-    non_blocking = True
-    print(" Start loader with pin_memory={} and non_blocking={}".format(pin_memory, non_blocking))
-    for num_workers in range(4, 10): 
-        train_loader = DataLoader(train_data, batch_size=20, shuffle = True, num_workers = num_workers, pin_memory = pin_memory)
+
+    print(" Start loader with pin_memory={} and non_blocking={}".format(args.pin_memory, args.non_blocking))
+    for num_workers in range(args.start_nw, args.end_nw + 1): 
+        train_loader = DataLoader(train_data, batch_size = args.batch_size, shuffle = False, num_workers = num_workers, pin_memory = args.pin_memory)
         # val_loader = DataLoader(val_data, batch_size = 64, shuffle = False, num_workers = num_workers, pin_memory = pin_memory)
         
         start = time.time()
-        loop(train_loader, non_blocking)
+        loop(train_loader, args.non_blocking)
         end = time.time()
         delta = end - start
         print(" Finish train_loader with: {} seconds, num_workers={}\n".format(delta, num_workers))
