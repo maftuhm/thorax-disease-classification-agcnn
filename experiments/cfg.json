@@ -31,7 +31,7 @@
 		},
 		"ReduceLROnPlateau" : {
 			"mode" : "max", 
-			"patience" : 2,
+			"patience" : 3,
 			"factor" : 0.1,
 			"verbose" : true
 		},

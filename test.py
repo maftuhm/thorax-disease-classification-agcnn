@@ -183,7 +183,7 @@ def main():
 	print(" Testing over time {}:".format(datetime.now() - start_time_test))
 
 	AUROCs_global = compute_AUCs(ground_truth, pred_global)
-	AUROCs_global_avg = np.array(AUROCs_global).mean()
+	AUROCs_global_avg = np.array(AUROCs_global[:14]).mean()
 
 	AUROCs_local = [0. for a in range(NUM_CLASSES)]
 	AUROCs_local_avg = 0.
@@ -192,9 +192,9 @@ def main():
 
 	if args.branch == 'all':
 		AUROCs_local = compute_AUCs(ground_truth, pred_local)
-		AUROCs_local_avg = np.array(AUROCs_local).mean()
+		AUROCs_local_avg = np.array(AUROCs_local[:14]).mean()
 		AUROCs_fusion = compute_AUCs(ground_truth, pred_fusion)
-		AUROCs_fusion_avg = np.array(AUROCs_fusion).mean()
+		AUROCs_fusion_avg = np.array(AUROCs_fusion[:14]).mean()
 
 	write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs' + add_text + '.csv'),
 						data = ['Global'] + list(AUROCs_global) + [AUROCs_global_avg],

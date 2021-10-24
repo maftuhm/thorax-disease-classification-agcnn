@@ -49,7 +49,7 @@ with open(path.join(args.exp_dir, "cfg_train.json")) as f:
 	exp_config = attrdict(exp_configs[args.exp_num])
 
 if C.m.local in exp_config.branch:
-	del exp_configs[exp_config.net].branch
+	del exp_configs[exp_config.net]['branch']
 
 	if exp_config.net != '?':
 		global_branch_exp = exp_config.net
@@ -269,10 +269,7 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 	writer.add_scalars("val/loss", {branch: epoch_loss}, epoch)
 
 	AUROCs = compute_AUCs(gt, pred)
-	if len(CLASS_NAMES) > 14:
-		AUROCs_mean = np.array(AUROCs)[:14].mean()
-	else:
-		AUROCs_mean = np.array(AUROCs).mean()
+	AUROCs_mean = np.array(AUROCs[:14]).mean()
 
 	writer.add_scalars("val/AUROCs", {branch: AUROCs_mean}, epoch)
 
@@ -399,7 +396,7 @@ def main():
 			del save_dict_global
 			torch.cuda.empty_cache()
 
-		if branch_name == C.m.local:
+		if branch_name == C.m.fusion:
 			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_auroc' + '.pth'), map_location='cpu')
 			GlobalModel.load_state_dict(save_dict_global['net'])			
 			GlobalModel.eval()
@@ -507,7 +504,7 @@ def main():
 
 			print(" Training epoch time: {}\n".format(datetime.now() - start_time_epoch))
 
-		# val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion['test'].to(device) if isinstance(criterion, dict) else criterion, TestModel)
+		val_one_epoch(config['NUM_EPOCH'], branch_name, Model, test_loader, criterion['test'].to(device) if isinstance(criterion, dict) else criterion, TestModel)
 		del Model, TestModel, train_dataset, train_loader, val_dataset, val_loader, test_dataset, test_loader, criterion, optimizer
 		torch.cuda.empty_cache()
 
