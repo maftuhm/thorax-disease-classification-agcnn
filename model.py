@@ -45,10 +45,12 @@ class FusionNet(nn.Module):
             raise Exception("backbone must be resnet50 or densenet121")
 
         if self.add_layer:
-            self.fc = nn.Linear(len_input * 2, len_input // 2)
-            self.fc1 = nn.Linear(len_input // 2, len_input // 4)
-            self.fc2 = nn.Linear(len_input // 4, len_input // 8)
-            self.fc3 = nn.Linear(len_input // 8, num_classes)
+            self.fc = nn.Linear(len_input * 2, len_input)
+            self.fc1 = nn.Linear(len_input, len_input // 2)
+            self.fc2 = nn.Linear(len_input // 2, len_input // 4)
+            self.fc3 = nn.Linear(len_input // 4, len_input // 8)
+            self.fc4 = nn.Linear(len_input // 8, len_input // 16)
+            self.fc5 = nn.Linear(len_input // 16, num_classes)
             self.relu = nn.ReLU()
         else:
             self.fc = nn.Linear(len_input * 2, num_classes)
@@ -59,10 +61,10 @@ class FusionNet(nn.Module):
         if self.add_layer:
             out = self.relu(out)
             out = self.fc1(out)
-            out = self.relu(out)
             out = self.fc2(out)
-            out = self.relu(out)
             out = self.fc3(out)
+            out = self.fc4(out)
+            out = self.fc5(out)
 
         out = torch.sigmoid(out)
 

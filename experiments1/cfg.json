@@ -1,5 +1,5 @@
 {
-	"NUM_EPOCH" : 30,
+	"NUM_EPOCH" : 25,
 	"num_classes" : 14,
 	"dataset" : {
 		"resize" : [256, 256],
@@ -7,8 +7,8 @@
 	},
 	"batch_size" : {
 		"global" : 80,
-		"local" : 80,
-		"fusion" : 80
+		"local" : 64,
+		"fusion" : 64
 	},
 	"optimizer" : {
 		"SGD" : {
@@ -40,6 +40,6 @@
 	"max_batch" : {
 		"global" : 20,
 		"local" : 16,
-		"fusion" : 10
+		"fusion" : 16
 	}
 }

@@ -94,7 +94,8 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 	# if test_model is not None:
 	# 	for key in test_model:
 	# 		if key != 'attention':
-	# 			test_model[key].train()
+				# for param in test_model[key].parameters():
+				# 	print(param.requires_grad, end=", ")
 
 	optimizer.zero_grad()
 
@@ -332,7 +333,7 @@ def main():
 	if C.m.local in config.branch:
 		print(" Local branch")
 		LocalModel = MainNet(num_classes = NUM_CLASSES, **config.net)
-		FusionModel = FusionNet(threshold = config.threshold, distance_function = config.L_function, num_classes = NUM_CLASSES, **config.net)
+		FusionModel = FusionNet(threshold = config.threshold, distance_function = config.L_function, num_classes = NUM_CLASSES, add_layer = True, **config.net)
 	AttentionGenPatchs = AttentionMaskInference(threshold = config.threshold, distance_function = config.L_function)
 	print(" L distance function \t:", config.L_function)
 	print(" Threshold \t\t:", config.threshold)

@@ -25,7 +25,7 @@
 	},
 	"lr_scheduler" : {
 		"StepLR" : {
-			"step_size" : 20, 
+			"step_size" : 10, 
 			"gamma" : 0.1,
 			"verbose" : true
 		},

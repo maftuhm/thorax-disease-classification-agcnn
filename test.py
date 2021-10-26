@@ -113,7 +113,7 @@ def main():
 	checkpoint_global = os.path.join(exp_dir_num, args.exp_num + '_global' + add_text + '.pth')
 	if args.branch == 'all':
 		checkpoint_global = os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_auroc.pth')
-		checkpoint_local = os.path.join(exp_dir_num, args.exp_num + '_local' + add_text + '.pth')
+		checkpoint_local = os.path.join(exp_dir_num, args.exp_num + '_local_best_auroc.pth')
 		checkpoint_fusion = os.path.join(exp_dir_num, args.exp_num + '_fusion' + add_text + '.pth')
 
 	if os.path.isfile(checkpoint_global):

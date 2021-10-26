@@ -182,7 +182,6 @@ class DenseNet(nn.Module):
         self.features.add_module('norm5', nn.BatchNorm2d(num_features))
 
         # ----------------- additional last pooling layer -----------------
-        last_pool = 'lse'
         if last_pool == 'lse':
             self.last_pool = LSEPool2d(controller = lse_pool_controller)
         elif last_pool == 'max':

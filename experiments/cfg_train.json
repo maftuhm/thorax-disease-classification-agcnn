@@ -351,19 +351,35 @@
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",
-		"lr_scheduler" : "CyclicLR",
+		"lr_scheduler" : "ReduceLROnPlateau",
 		"loss" : "BCELoss",
 		"L_function" : "L2",
 		"threshold" : 0.7,
 		"max_batch" : {
 			"global" : 20,
-			"local" : 20,
+			"local" : 16,
 			"fusion": 64
 		},
 		"batch_size" : {
 			"global" : 80,
-			"local" : 80,
+			"local" : 64,
 			"fusion": 64
 		}
+	},
+	"agcnn22" : {
+		"NUM_EPOCH" : 25,
+		"num_classes" : 15,
+		"net" : "agcnn21",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L2",
+		"threshold" : 0.7
+	},
+	"agcnn23" : {
+		"NUM_EPOCH" : 25,
+		"num_classes" : 15,
+		"net" : "agcnn19",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L2",
+		"threshold" : 0.7
 	}
 }
