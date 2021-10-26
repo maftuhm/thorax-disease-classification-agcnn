@@ -333,7 +333,7 @@ def main():
 	if C.m.local in config.branch:
 		print(" Local branch")
 		LocalModel = MainNet(num_classes = NUM_CLASSES, **config.net)
-		FusionModel = FusionNet(threshold = config.threshold, distance_function = config.L_function, num_classes = NUM_CLASSES, add_layer = True, **config.net)
+		FusionModel = FusionNet(threshold = config.threshold, distance_function = config.L_function, num_classes = NUM_CLASSES, **config.net)
 	AttentionGenPatchs = AttentionMaskInference(threshold = config.threshold, distance_function = config.L_function)
 	print(" L distance function \t:", config.L_function)
 	print(" Threshold \t\t:", config.threshold)

@@ -215,7 +215,7 @@ class DenseNet(nn.Module):
         out = torch.sigmoid(out)
 
         result = {
-            'score': x,
+            'score': out,
             'features': features,
             'pool': flatten_pool
         }
