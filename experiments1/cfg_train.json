@@ -16,15 +16,48 @@
 	},
 	"exp1" : {
 		"net" : {
+			"backbone" : "densenet121",
+			"last_pool" : "avg"
+		},
+		"branch" : ["global"],
+		"optimizer" : "SGD",
+		"lr_scheduler" : "ReduceLROnPlateau",
+		"loss" : "BCELoss",
+		"L_function" : "L1",
+		"threshold" : 0.7,
+		"max_batch" : {
+			"global" : 10
+		}
+	},
+	"exp2" : {
+		"net" : {
+			"backbone" : "densenet121",
+			"last_pool" : "lse",
+			"lse_pool_controller" : 10
+		},
+		"branch" : ["global"],
+		"optimizer" : "SGD",
+		"lr_scheduler" : "ReduceLROnPlateau",
+		"loss" : "BCELoss",
+		"L_function" : "L1",
+		"threshold" : 0.7,
+		"max_batch" : {
+			"global" : 10
+		}
+	},
+	"exp3" : {
+		"net" : {
 			"backbone" : "resnet50",
 			"last_pool" : "max"
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",
 		"lr_scheduler" : "ReduceLROnPlateau",
-		"loss" : "BCELoss"
+		"loss" : "BCELoss",
+		"L_function" : "L1",
+		"threshold" : 0.7
 	},
-	"exp2" : {
+	"exp4" : {
 		"net" : {
 			"backbone" : "resnet101",
 			"last_pool" : "max"
@@ -33,11 +66,13 @@
 		"optimizer" : "SGD",
 		"lr_scheduler" : "ReduceLROnPlateau",
 		"loss" : "BCELoss",
+		"L_function" : "L1",
+		"threshold" : 0.7,
 		"max_batch" : {
-			"global" : 16
+			"global" : 10
 		}
 	},
-	"exp3" : {
+	"exp5" : {
 		"net" : {
 			"backbone" : "?",
 			"last_pool" : "max"
@@ -47,7 +82,7 @@
 		"lr_scheduler" : "ReduceLROnPlateau",
 		"loss" : "WeightedBCELoss"
 	},
-	"exp4" : {
+	"exp6" : {
 		"net" : {
 			"backbone" : "?",
 			"last_pool" : "lse",
@@ -58,7 +93,7 @@
 		"lr_scheduler" : "ReduceLROnPlateau",
 		"loss" : "?"
 	},
-	"exp5" : {
+	"exp7" : {
 		"net" : {
 			"backbone" : "?",
 			"last_pool" : "avg"

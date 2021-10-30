@@ -348,13 +348,13 @@ def main():
 
 		# ================= LOAD DATASET ================= #
 		train_dataset = ChestXrayDataSet(DATA_DIR, 'train', num_classes = NUM_CLASSES, transform = transform_train, init_transform=transform_init)
-		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 4, pin_memory = True, drop_last=True)
+		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 5, pin_memory = True, drop_last=True)
 
 		val_dataset = ChestXrayDataSet(DATA_DIR, 'val', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		val_loader = DataLoader(dataset = val_dataset, batch_size = 60, shuffle = False, num_workers = 4, pin_memory = False)
+		val_loader = DataLoader(dataset = val_dataset, batch_size = 60, shuffle = False, num_workers = 5, pin_memory = False)
 
 		test_dataset = ChestXrayDataSet(DATA_DIR, 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
-		test_loader = DataLoader(dataset = test_dataset, batch_size = 60, shuffle = False, num_workers = 4, pin_memory = False)
+		test_loader = DataLoader(dataset = test_dataset, batch_size = 60, shuffle = False, num_workers = 5, pin_memory = False)
 
 		if config.loss == C.l.BCELoss:
 			criterion = nn.BCELoss()
