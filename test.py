@@ -27,7 +27,7 @@ def parse_args():
 	parser.add_argument("--exp_num", type=str, default='exp0', help='define experiment directory (ex: /exp0)')
 	parser.add_argument("--best_model", "-b", action="store_true")
 	parser.add_argument("--loss", "-l", action="store_true")
-	parser.add_argument("--branch", type=str, default='all', help='define branch global or all')
+	parser.add_argument("--all_branch",  "-all", action="store_true")
 	args = parser.parse_args()
 	return args
 
@@ -41,7 +41,7 @@ with open(os.path.join(args.exp_dir, "cfg_train.json")) as f:
 	exp_configs = json.load(f)
 	exp_config = exp_configs[args.exp_num]
 
-if args.branch == 'all':
+if args.all_branch:
 	del exp_configs[exp_config['net']]['branch']
 	if exp_config['net'] != '?':
 		global_branch_exp = exp_config['net']
@@ -95,7 +95,7 @@ def main():
 	# ================= MODELS ================= #
 	GlobalModel = MainNet(pretrained = False, num_classes = NUM_CLASSES, **config['net']).to(device)
 	
-	if args.branch == 'all':
+	if args.all_branch:
 		LocalModel = MainNet(pretrained = False, num_classes = NUM_CLASSES, **config['net']).to(device)
 		AttentionGenPatchs = AttentionMaskInference(threshold = config['threshold'], distance_function = config['L_function'])
 		FusionModel = FusionNet(backbone = config['net']['backbone'], num_classes = NUM_CLASSES).to(device)
@@ -111,7 +111,7 @@ def main():
 		add_text = ''
 
 	checkpoint_global = os.path.join(exp_dir_num, args.exp_num + '_global' + add_text + '.pth')
-	if args.branch == 'all':
+	if args.all_branch:
 		checkpoint_global = os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_auroc.pth')
 		checkpoint_local = os.path.join(exp_dir_num, args.exp_num + '_local_best_auroc.pth')
 		checkpoint_fusion = os.path.join(exp_dir_num, args.exp_num + '_fusion' + add_text + '.pth')
@@ -125,7 +125,7 @@ def main():
 	else:
 		raise Exception("Global Model does not exist")
 
-	if args.branch == 'all':
+	if args.all_branch:
 		if os.path.isfile(checkpoint_local):
 			save_dict = torch.load(checkpoint_local)
 			LocalModel.load_state_dict(save_dict['net'])
@@ -150,13 +150,13 @@ def main():
 
 	GlobalModel.eval()
 
-	if args.branch == 'all':
+	if args.all_branch:
 		LocalModel.eval()
 		FusionModel.eval()
 
 	ground_truth = torch.FloatTensor()
 	pred_global = torch.FloatTensor()
-	if args.branch == 'all':
+	if args.all_branch:
 		pred_local = torch.FloatTensor()
 		pred_fusion = torch.FloatTensor()
 
@@ -167,7 +167,7 @@ def main():
 		# compute output
 		output_global = GlobalModel(image.to(device))
 
-		if args.branch == 'all':
+		if args.all_branch:
 			output_patches = AttentionGenPatchs(image.detach(), output_global['features'].detach().cpu())
 
 			output_local = LocalModel(output_patches['image'].to(device))
@@ -178,7 +178,7 @@ def main():
 		ground_truth = torch.cat((ground_truth, target.detach()), 0)
 		pred_global = torch.cat((pred_global.detach(), output_global['score'].detach().cpu()), 0)
 
-		if args.branch == 'all':
+		if args.all_branch:
 			pred_local = torch.cat((pred_local.detach(), output_local['score'].detach().cpu()), 0)
 			pred_fusion = torch.cat((pred_fusion.detach(), output_fusion['score'].detach().cpu()), 0)
 
@@ -200,7 +200,7 @@ def main():
 	AUROCs_fusion = [0. for a in range(NUM_CLASSES)]
 	AUROCs_fusion_avg = 0.
 
-	if args.branch == 'all':
+	if args.all_branch:
 		AUROCs_local = compute_AUCs(ground_truth, pred_local)
 		AUROCs_local_avg = np.array(AUROCs_local[:14]).mean()
 		AUROCs_fusion = compute_AUCs(ground_truth, pred_fusion)
@@ -209,7 +209,7 @@ def main():
 	write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs' + add_text + '.csv'),
 						data = ['Global'] + list(AUROCs_global) + [AUROCs_global_avg],
 						mode = 'a')
-	if args.branch == 'all':
+	if args.all_branch:
 		write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs' + add_text + '.csv'),
 							data = ['Local'] + list(AUROCs_local) + [AUROCs_local_avg],
 							mode = 'a')

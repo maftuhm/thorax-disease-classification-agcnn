@@ -136,7 +136,7 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 
 				del output_global, output_local
 				torch.cuda.empty_cache()
-
+		# with torch.autograd.detect_anomaly():
 		images = images.to(device, non_blocking=True)
 		targets = targets.to(device, non_blocking=True)
 

@@ -74,15 +74,32 @@
 	},
 	"exp5" : {
 		"net" : {
-			"backbone" : "?",
+			"backbone" : "densenet121",
 			"last_pool" : "max"
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",
 		"lr_scheduler" : "ReduceLROnPlateau",
-		"loss" : "WeightedBCELoss"
+		"loss" : "WeightedBCELoss",
+		"L_function" : "L1",
+		"threshold" : 0.7,
+		"max_batch" : {
+			"global" : 10
+		}
 	},
 	"exp6" : {
+		"net" : {
+			"backbone" : "resnet50",
+			"last_pool" : "max"
+		},
+		"branch" : ["global"],
+		"optimizer" : "SGD",
+		"lr_scheduler" : "ReduceLROnPlateau",
+		"loss" : "WeightedBCELoss",
+		"L_function" : "L1",
+		"threshold" : 0.7
+	},
+	"exp7" : {
 		"net" : {
 			"backbone" : "?",
 			"last_pool" : "lse",
@@ -93,7 +110,7 @@
 		"lr_scheduler" : "ReduceLROnPlateau",
 		"loss" : "?"
 	},
-	"exp7" : {
+	"exp8" : {
 		"net" : {
 			"backbone" : "?",
 			"last_pool" : "avg"
