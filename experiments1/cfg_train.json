@@ -101,6 +101,21 @@
 	},
 	"exp7" : {
 		"net" : {
+			"backbone" : "densenet121",
+			"last_pool" : "max"
+		},
+		"branch" : ["global"],
+		"optimizer" : "Adam",
+		"lr_scheduler" : "ReduceLROnPlateau",
+		"loss" : "BCELoss",
+		"L_function" : "L1",
+		"threshold" : 0.7,
+		"max_batch" : {
+			"global" : 10
+		}
+	},
+	"exp8" : {
+		"net" : {
 			"backbone" : "?",
 			"last_pool" : "lse",
 			"lse_pool_controller" : 10
@@ -110,7 +125,7 @@
 		"lr_scheduler" : "ReduceLROnPlateau",
 		"loss" : "?"
 	},
-	"exp8" : {
+	"exp9" : {
 		"net" : {
 			"backbone" : "?",
 			"last_pool" : "avg"

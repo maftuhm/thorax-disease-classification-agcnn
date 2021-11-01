@@ -255,8 +255,8 @@ def DenseNet121(pretrained = True, num_classes = 14, is_grayscale = True, last_p
         state_dict['classifier.bias'] = model.state_dict()['classifier.bias']
 
         model.load_state_dict(state_dict)
-        del state_dict
-        torch.cuda.empty_cache()
+        # del state_dict
+        # torch.cuda.empty_cache()
         print(" State dict is loaded")
 
     return model

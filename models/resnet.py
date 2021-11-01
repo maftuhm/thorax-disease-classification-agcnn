@@ -281,7 +281,7 @@ def ResNet50(pretrained = True, num_classes = 14, is_grayscale = True, last_pool
         # state_dict['fc.bias'] = model.state_dict()['fc.bias'].data
 
         model.load_state_dict(model_state_dict)
-        del loaded_state_dict, model_state_dict
+        del loaded_state_dict
         torch.cuda.empty_cache()
         print(" State dict is loaded")
 
