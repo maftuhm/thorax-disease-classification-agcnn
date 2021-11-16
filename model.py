@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from models import ResNet50, ResNet101, DenseNet121
-from utils import AttentionMaskInference
+from utils import AttentionMaskInference, LSEPool2d
 
 def MainNet(backbone = 'resnet50', **kwargs):
 
@@ -16,12 +16,11 @@ def MainNet(backbone = 'resnet50', **kwargs):
     else:
         raise Exception("backbone must be resnet50, resnet101 or densenet121")
 
-    print(" Backbone \t\t:", backbone)
-    print(" Last pooling layer\t:", kwargs.get('last_pool'))
+    print(" Backbone \t\t:", model.__class__.__name__)
     print(" Pretrained model \t:", kwargs.get('pretrained', True))
-    if kwargs.get('last_pool') == 'lse':
-        print(" lse pooling controller :", kwargs.get('lse_pool_controller'))
-        # print(" Group normalization \t:", group_norm)
+    print(" Last pooling layer\t:", model.last_pool.__class__.__name__)
+    if isinstance(model.last_pool, LSEPool2d):
+        print(" lse pooling controller :", model.last_pool.controller)
 
     return model
 

@@ -336,7 +336,7 @@ def main():
 		FusionModel = FusionNet(threshold = config.threshold, distance_function = config.L_function, num_classes = NUM_CLASSES, **config.net)
 	AttentionGenPatchs = AttentionMaskInference(threshold = config.threshold, distance_function = config.L_function)
 	print(" L distance function \t:", config.L_function)
-	print(" Threshold \t\t:", config.threshold)
+	print(" Threshold \t\t:", AttentionGenPatchs.threshold)
 	print(" Num classes \t\t:", NUM_CLASSES)
 	print(" Optimizer \t\t:", list(config.optimizer.keys())[0])
 	print(" Lr Scheduler \t\t:", list(config.lr_scheduler.keys())[0])
