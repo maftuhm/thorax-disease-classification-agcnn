@@ -12,9 +12,10 @@ def weighted_binary_cross_entropy(sigmoid_x, targets, pos_weight, neg_weight, we
     if not (targets.size() == sigmoid_x.size()):
         raise ValueError("Target size ({}) must be the same as input size ({})".format(targets.size(), sigmoid_x.size()))
 
-    # sigmoid_x = sigmoid_x.clamp(min=1e-7, max=1.-1e-7)
+    eps = 1e-16
+    # sigmoid_x = sigmoid_x.clamp(min=1e-32)
     # print("sigmoid_x:{},\nsigmoid_x.log():{},\n(1 - sigmoid_x).log():{}".format(sigmoid_x.data, sigmoid_x.log().data, (1 - sigmoid_x).log().data), end=", ")
-    loss = - pos_weight * targets * sigmoid_x.log().clamp(min=-100) - neg_weight * (1 - targets) * (1 - sigmoid_x).log().clamp(min=-100)
+    loss = - pos_weight * targets * sigmoid_x.clamp(min=eps).log() - neg_weight * (1 - targets) * (1 - sigmoid_x).clamp(min=eps).log()
 
     if weight is not None:
         loss = loss * weight
