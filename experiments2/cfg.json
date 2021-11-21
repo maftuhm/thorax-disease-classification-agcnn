@@ -25,12 +25,11 @@
 	},
 	"lr_scheduler" : {
 		"StepLR" : {
-			"step_size" : 20, 
-			"gamma" : 0.1,
-			"verbose" : true
+			"step_size" : 10, 
+			"gamma" : 0.1
 		},
 		"ReduceLROnPlateau" : {
-			"mode" : "max", 
+			"mode" : "min", 
 			"patience" : 3,
 			"factor" : 0.1,
 			"threshold" : 0.001,

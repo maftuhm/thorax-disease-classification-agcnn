@@ -62,9 +62,10 @@
 			"backbone" : "resnet50",
 			"last_pool" : "max"
 		},
+		"num_classes" : 15,
 		"branch" : ["global"],
 		"optimizer" : "SGD",
-		"lr_scheduler" : "ReduceLROnPlateau",
+		"lr_scheduler" : "StepLR",
 		"loss" : "BCELoss",
 		"L_function" : "Lmax",
 		"threshold" : 0.7
@@ -74,10 +75,20 @@
 			"backbone" : "densenet121",
 			"last_pool" : "max"
 		},
+		"num_classes" : 15,
 		"branch" : ["global"],
 		"optimizer" : "SGD",
-		"lr_scheduler" : "ReduceLROnPlateau",
+		"lr_scheduler" : "StepLR",
 		"loss" : "BCELoss",
+		"L_function" : "Lmax",
+		"threshold" : 0.7,
+		"max_batch" : {
+			"global" : 10
+		}
+	},
+	"agcnn01" : {
+		"net" : "agcnn",
+		"branch" : ["local", "fusion"],
 		"L_function" : "Lmax",
 		"threshold" : 0.7
 	}
