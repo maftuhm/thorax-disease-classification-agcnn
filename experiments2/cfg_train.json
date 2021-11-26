@@ -136,7 +136,7 @@
 	},
 	"exp3" : {
 		"net" : {
-			"backbone" : "?",
+			"backbone" : "resnet50",
 			"last_pool" : "max"
 		},
 		"branch" : ["global"],
@@ -146,30 +146,60 @@
 		"L_function" : "Lmax",
 		"threshold" : 0.7
 	},
+	"exp31" : {
+		"net" : {
+			"backbone" : "resnet50",
+			"last_pool" : "lse",
+			"lse_pool_controller" : 10
+		},
+		"branch" : ["global"],
+		"optimizer" : "SGD",
+		"lr_scheduler" : "StepLR",
+		"loss" : "WeightedBCELoss",
+		"L_function" : "Lmax",
+		"threshold" : 0.7
+	},
+	"exp32" : {
+		"net" : {
+			"backbone" : "resnet50",
+			"last_pool" : "avg"
+		},
+		"branch" : ["global"],
+		"optimizer" : "SGD",
+		"lr_scheduler" : "StepLR",
+		"loss" : "WeightedBCELoss",
+		"L_function" : "Lmax",
+		"threshold" : 0.7
+	},
 	"exp4" : {
 		"net" : {
-			"backbone" : "?",
+			"backbone" : "densenet121",
 			"last_pool" : "lse",
 			"lse_pool_controller" : 10
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",
 		"lr_scheduler" : "ReduceLROnPlateau",
-		"loss" : "?",
+		"loss" : "WeightedBCELoss",
 		"L_function" : "Lmax",
-		"threshold" : 0.7
+		"threshold" : 0.7,
+		"max_batch" : {
+			"global" : 10
+		}
 	},
 	"exp5" : {
 		"net" : {
-			"backbone" : "?",
-			"last_pool" : "avg",
-			"lse_pool_controller" : 10
+			"backbone" : "densenet121",
+			"last_pool" : "avg"
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",
 		"lr_scheduler" : "ReduceLROnPlateau",
-		"loss" : "?",
+		"loss" : "WeightedBCELoss",
 		"L_function" : "Lmax",
-		"threshold" : 0.7
+		"threshold" : 0.7,
+		"max_batch" : {
+			"global" : 10
+		}
 	}
 }
