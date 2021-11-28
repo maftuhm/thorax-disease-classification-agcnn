@@ -484,7 +484,7 @@ def main():
 				# distance_loss_auroc = distance_loss_auroc.sum().sqrt()
 				# writer.add_scalars("val/distance_loss_auroc", {branch_name: distance_loss_auroc}, epoch)
 
-				lr_scheduler.step(val_loss)
+				lr_scheduler.step(val_auroc)
 			elif isinstance(lr_scheduler, optim.lr_scheduler.StepLR):
 				lr_scheduler.step()
 

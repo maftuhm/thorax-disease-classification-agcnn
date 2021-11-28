@@ -146,6 +146,32 @@
 		"L_function" : "Lmax",
 		"threshold" : 0.7
 	},
+	"exp30" : {
+		"net" : {
+			"backbone" : "resnet50",
+			"last_pool" : "avg"
+		},
+		"branch" : ["global"],
+		"optimizer" : "SGD",
+		"lr_scheduler" : "ReduceLROnPlateau",
+		"loss" : "WeightedBCELoss",
+		"L_function" : "Lmax",
+		"threshold" : 0.7
+	},
+	"exp301" : {
+		"net" : {
+			"backbone" : "resnet50",
+			"last_pool" : "lse",
+			"lse_pool_controller" : 10
+		},
+		"branch" : ["global"],
+		"optimizer" : "SGD",
+		"lr_scheduler" : "ReduceLROnPlateau",
+		"loss" : "WeightedBCELoss",
+		"L_function" : "Lmax",
+		"threshold" : 0.7
+	},
+	"__comment__" : "exp31 and axp32 just want to know if using StepLR scheduler",
 	"exp31" : {
 		"net" : {
 			"backbone" : "resnet50",
@@ -171,6 +197,7 @@
 		"L_function" : "Lmax",
 		"threshold" : 0.7
 	},
+	"__comment__" : "exp31 and axp32 just want to know if using StepLR scheduler",
 	"exp4" : {
 		"net" : {
 			"backbone" : "densenet121",
