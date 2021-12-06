@@ -168,6 +168,8 @@ class ResNet(nn.Module):
             self.last_pool = nn.MaxPool2d(kernel_size = 7, stride = 1)
         elif last_pool == 'avg':
             self.last_pool = nn.AvgPool2d(kernel_size = 7, stride = 1)
+        elif last_pool == 'adaptive_avg':
+            self.last_pool = nn.AdaptiveAvgPool2d((1, 1))
         else:
             raise Exception("pooling layer must be lse, max or avg")
 

@@ -71,7 +71,14 @@ class AttentionMaskInference:
         heatmap = self.distance(features)
         out_heatmap = self.resize(heatmap.unsqueeze(1)).squeeze(1)
 
-        heatmap = (out_heatmap > self.threshold).float()
+        if isinstance(self.threshold, tuple) or isinstance(self.threshold, list):
+            # still error
+            heatmap[heatmap < self.threshold[0]] = 0.
+            heatmap[heatmap > self.threshold[1]] = 0.
+            heatmap[heatmap != 0.] = 1.
+        else:
+            heatmap = (out_heatmap > self.threshold).float()
+
         out, coords = self.crop_resize(x, heatmap)
 
         result = {
