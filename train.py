@@ -425,9 +425,12 @@ def main():
 			# for op in config['optimizer']:
 			# 	config['optimizer'][op]['lr'] /= 10
 
+
 		if C.o.SGD in config.optimizer:
+			if branch_name == C.m.fusion: config.optimizer.SGD['lr'] = 0.001
 			optimizer = optim.SGD(Model.parameters(), **config.optimizer.SGD)
 		elif C.o.Adam in config.optimizer:
+			if branch_name == C.m.fusion: config.optimizer.Adam['lr'] = 0.001
 			optimizer = optim.Adam(Model.parameters(), **config.optimizer.Adam)
 		else:
 			raise Exception("optimizer must be SGD or Adam")
