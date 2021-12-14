@@ -191,7 +191,6 @@
 		"threshold" : 0.4
 	},
 	"exp16" : {
-		"NUM_EPOCH" : 20,
 		"net" : "exp01",
 		"branch" : ["local", "fusion"],
 		"L_function" : "Lmax",

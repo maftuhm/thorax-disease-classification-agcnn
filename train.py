@@ -384,6 +384,7 @@ def main():
 
 		if branch_name == C.m.local:
 			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_auroc' + '.pth'))
+			print(" Loaded global branch model checkpoint from epoch " + str(save_dict_global['epoch']) + " for train local branch")
 			GlobalModel.load_state_dict(save_dict_global['net'])
 			GlobalModel.eval()
 			GlobalModel.requires_grad_(False)
@@ -399,11 +400,13 @@ def main():
 
 		if branch_name == C.m.fusion:
 			save_dict_global = torch.load(os.path.join(args.exp_dir, global_branch_exp, global_branch_exp + '_global_best_auroc' + '.pth'), map_location='cpu')
+			print(" Loaded global branch model checkpoint from epoch " + str(save_dict_global['epoch']) + " for fusion local branch")
 			GlobalModel.load_state_dict(save_dict_global['net'])			
 			GlobalModel.eval()
 			GlobalModel.requires_grad_(False)
 
 			save_dict_local = torch.load(os.path.join(exp_dir_num, args.exp_num + '_local_best_auroc' + '.pth'), map_location='cpu')
+			print(" Loaded local branch model checkpoint from epoch " + str(save_dict_local['epoch']) + " for fusion local branch")
 			LocalModel.load_state_dict(save_dict_local['net'])
 			LocalModel.eval()
 			LocalModel.requires_grad_(False)
