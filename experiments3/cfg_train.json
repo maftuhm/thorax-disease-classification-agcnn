@@ -200,14 +200,14 @@
 		"NUM_EPOCH" : 20,
 		"net" : "exp01",
 		"branch" : ["local", "fusion"],
-		"L_function" : "L1",
+		"L_function" : "L2",
 		"threshold" : 0.4
 	},
 	"exp18" : {
 		"NUM_EPOCH" : 20,
 		"net" : "exp01",
 		"branch" : ["local", "fusion"],
-		"L_function" : "L2",
+		"L_function" : "L1",
 		"threshold" : 0.4
 	},
 	"exp19" : {
