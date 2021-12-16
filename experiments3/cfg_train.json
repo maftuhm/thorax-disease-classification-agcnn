@@ -197,30 +197,76 @@
 		"threshold" : 0.4
 	},
 	"exp17" : {
-		"NUM_EPOCH" : 20,
 		"net" : "exp01",
 		"branch" : ["local", "fusion"],
 		"L_function" : "L2",
 		"threshold" : 0.4
 	},
 	"exp18" : {
-		"NUM_EPOCH" : 20,
 		"net" : "exp01",
 		"branch" : ["local", "fusion"],
 		"L_function" : "L1",
 		"threshold" : 0.4
 	},
 	"exp19" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "Lmax",
+		"threshold" : 0.5
+	},
+	"exp18" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L2",
+		"threshold" : 0.5
+	},
+	"exp20" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L1",
+		"threshold" : 0.5
+	},
+	"exp21" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "Lmax",
+		"threshold" : 0.6
+	},
+	"exp22" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L2",
+		"threshold" : 0.6
+	},
+	"exp23" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L1",
+		"threshold" : 0.6
+	},
+	"exp24" : {
 		"net" : {
-			"backbone" : "densenet121",
-			"last_pool" : "max"
+			"backbone" : "resnet50",
+			"last_pool" : "avg"
 		},
 		"branch" : ["global"],
 		"optimizer" : "SGD",
 		"lr_scheduler" : "ReduceLROnPlateau",
 		"loss" : "BCELoss",
-		"L_function" : "Lmax",
-		"threshold" : 0.4,
+		"L_function" : "L2",
+		"threshold" : 0.5
+	},
+	"exp25" : {
+		"net" : {
+			"backbone" : "densenet121",
+			"last_pool" : "avg"
+		},
+		"branch" : ["global"],
+		"optimizer" : "SGD",
+		"lr_scheduler" : "ReduceLROnPlateau",
+		"loss" : "BCELoss",
+		"L_function" : "L2",
+		"threshold" : 0.5,
 		"max_batch" : {
 			"global" : 10
 		}
