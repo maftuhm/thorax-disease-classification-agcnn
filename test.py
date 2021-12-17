@@ -25,6 +25,7 @@ def parse_args():
 	parser = argparse.ArgumentParser(description='AG-CNN')
 	parser.add_argument("--exp_dir", type=str, default='./final_experiments', help='define experiment directory (ex: /exp16)')
 	parser.add_argument("--exp_num", type=str, default='exp0', help='define experiment directory (ex: /exp0)')
+	parser.add_argument("--dataset", type=str, default='test', help='define dataset name (ex: train, val or test)')
 	parser.add_argument("--best_model", "-b", action="store_true")
 	parser.add_argument("--loss", "-l", action="store_true")
 	parser.add_argument("--all_branch",  "-all", action="store_true")
@@ -63,7 +64,7 @@ if 'num_classes' in list(config.keys()):
 
 NUM_CLASSES = len(CLASS_NAMES)
 
-MAX_BATCH_CAPACITY = 64
+MAX_BATCH_CAPACITY = 60
 if MAX_BATCH_CAPACITY % 5 == 0:
 	num_workers = 5
 else:
@@ -89,7 +90,7 @@ def main():
 
 	# ================= LOAD DATASET ================= #
 
-	test_dataset = ChestXrayDataSet(DATA_DIR, 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
+	test_dataset = ChestXrayDataSet(DATA_DIR, args.dataset, num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
 	test_loader = DataLoader(dataset = test_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = False, num_workers = num_workers, pin_memory = True)
 
 	# ================= MODELS ================= #
@@ -144,10 +145,6 @@ def main():
 		else:
 			raise Exception("Fusion Model does not exist")
 
-	write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs' + add_text + '.csv'),
-						data = ['Model'] + CLASS_NAMES + ['Mean'],
-						mode = 'w')
-
 	GlobalModel.eval()
 
 	if args.all_branch:
@@ -195,6 +192,8 @@ def main():
 	AUROCs_global = compute_AUCs(ground_truth, pred_global)
 	AUROCs_global_avg = np.array(AUROCs_global[:14]).mean()
 
+	ROCs_global = compute_ROCs(ground_truth, pred_global)
+
 	AUROCs_local = [0. for a in range(NUM_CLASSES)]
 	AUROCs_local_avg = 0.
 	AUROCs_fusion = [0. for a in range(NUM_CLASSES)]
@@ -203,19 +202,33 @@ def main():
 	if args.all_branch:
 		AUROCs_local = compute_AUCs(ground_truth, pred_local)
 		AUROCs_local_avg = np.array(AUROCs_local[:14]).mean()
+		ROCs_local = compute_ROCs(ground_truth, pred_local)
 		AUROCs_fusion = compute_AUCs(ground_truth, pred_fusion)
 		AUROCs_fusion_avg = np.array(AUROCs_fusion[:14]).mean()
+		ROCs_fusion = compute_ROCs(ground_truth, pred_fusion)
 
-	write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs' + add_text + '.csv'),
-						data = ['Global'] + list(AUROCs_global) + [AUROCs_global_avg],
-						mode = 'a')
+	write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs_' + args.dataset + add_text + '.csv'),
+						data = ['Model'] + CLASS_NAMES + ['Mean'], mode = 'w')
+
+	write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs_' + args.dataset + add_text + '.csv'),
+						data = ['Global'] + list(AUROCs_global) + [AUROCs_global_avg], mode = 'a')
+
+	with open(os.path.join(exp_dir_num, args.exp_num + '_ROCs_global_' + args.dataset + add_text + '.json'), 'w') as f:
+		json.dump(ROCs_global, f)
+
 	if args.all_branch:
-		write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs' + add_text + '.csv'),
+		write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs_' + args.dataset + add_text + '.csv'),
 							data = ['Local'] + list(AUROCs_local) + [AUROCs_local_avg],
 							mode = 'a')
-		write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs' + add_text + '.csv'),
+		with open(os.path.join(exp_dir_num, args.exp_num + '_ROCs_local_' + args.dataset + add_text + '.json'), 'w') as f:
+			json.dump(ROCs_local, f)
+
+		write_csv(os.path.join(exp_dir_num, args.exp_num + '_AUROCs_' + args.dataset + add_text + '.csv'),
 							data = ['Fusion'] + list(AUROCs_fusion) + [AUROCs_fusion_avg],
 							mode = 'a')
+
+		with open(os.path.join(exp_dir_num, args.exp_num + '_ROCs_fusion_' + args.dataset + add_text + '.json'), 'w') as f:
+			json.dump(ROCs_fusion, f)
 
 	print("|===============================================================================================|")
 	print("|\t\t\t\t\t    AUROC\t\t\t\t\t\t|")

@@ -52,6 +52,32 @@ def compute_AUCs(gt, pred):
 		AUROCs.append(roc_auc_score(gt_np[:, i], pred_np[:, i]))
 	return AUROCs
 
+def compute_ROCs(gt, pred):
+	gt_np = gt.cpu().numpy()
+	pred_np = pred.cpu().numpy()
+
+	results = {
+		'fpr' : [],
+		'tpr' : [],
+		'thresholds': [],
+		'gmeans': [],
+		'idmax': [],
+		'optimal_threshold': []
+	}
+
+	for i in range(len(gt_np[0])):
+		fpr, tpr, thresholds = roc_curve(gt_np[:, i], pred_np[:, i])
+		gmeans = np.sqrt(tpr * (1-fpr))
+		ix = np.argmax(gmeans)
+		results['fpr'].append(fpr.tolist())
+		results['tpr'].append(tpr.tolist())
+		results['thresholds'].append(thresholds.tolist())
+		results['gmeans'].append(gmeans.tolist())
+		results['idmax'].append(int(ix))
+		results['optimal_threshold'].append(float(thresholds[ix]))
+
+	return results
+
 def get_threshold(gt, pred):
 	gt_np = gt.cpu().numpy()
 	pred_np = pred.cpu().numpy()
