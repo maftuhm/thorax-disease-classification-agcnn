@@ -202,13 +202,13 @@
 		"L_function" : "L2",
 		"threshold" : 0.4
 	},
-	"exp18" : {
+	"exp19" : {
 		"net" : "exp01",
 		"branch" : ["local", "fusion"],
 		"L_function" : "L1",
 		"threshold" : 0.4
 	},
-	"exp19" : {
+	"exp20" : {
 		"net" : "exp01",
 		"branch" : ["local", "fusion"],
 		"L_function" : "Lmax",
@@ -220,25 +220,25 @@
 		"L_function" : "L2",
 		"threshold" : 0.5
 	},
-	"exp20" : {
+	"exp21" : {
 		"net" : "exp01",
 		"branch" : ["local", "fusion"],
 		"L_function" : "L1",
 		"threshold" : 0.5
 	},
-	"exp21" : {
+	"exp22" : {
 		"net" : "exp01",
 		"branch" : ["local", "fusion"],
 		"L_function" : "Lmax",
 		"threshold" : 0.6
 	},
-	"exp22" : {
+	"exp23" : {
 		"net" : "exp01",
 		"branch" : ["local", "fusion"],
 		"L_function" : "L2",
 		"threshold" : 0.6
 	},
-	"exp23" : {
+	"exp26" : {
 		"net" : "exp01",
 		"branch" : ["local", "fusion"],
 		"L_function" : "L1",
