@@ -244,6 +244,60 @@
 		"L_function" : "L1",
 		"threshold" : 0.6
 	},
+	"exp27" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "Lmax",
+		"threshold" : 0.7
+	},
+	"exp28" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L2",
+		"threshold" : 0.7
+	},
+	"exp29" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L1",
+		"threshold" : 0.7
+	},
+	"exp30" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "Lmax",
+		"threshold" : 0.8
+	},
+	"exp31" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L2",
+		"threshold" : 0.8
+	},
+	"exp32" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L1",
+		"threshold" : 0.8
+	},
+	"exp33" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "Lmax",
+		"threshold" : 0.9
+	},
+	"exp34" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L2",
+		"threshold" : 0.9
+	},
+	"exp35" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L1",
+		"threshold" : 0.9
+	},
 	"exp24" : {
 		"net" : {
 			"backbone" : "resnet50",
