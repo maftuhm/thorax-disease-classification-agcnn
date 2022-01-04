@@ -373,6 +373,24 @@
 		"L_function" : "L1",
 		"threshold" : 0.8
 	},
+	"exp48" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "Lmax",
+		"threshold" : 0
+	},
+	"exp49" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L2",
+		"threshold" : 0
+	},
+	"exp50" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L1",
+		"threshold" : 0
+	},
 	"exp24" : {
 		"net" : {
 			"backbone" : "resnet50",
