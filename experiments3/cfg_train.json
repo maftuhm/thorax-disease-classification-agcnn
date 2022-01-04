@@ -89,10 +89,12 @@
 		"optimizer" : "SGD",
 		"lr_scheduler" : "ReduceLROnPlateau",
 		"loss" : "WeightedBCELoss",
-		"L_function" : "Lmax",
-		"threshold" : 0.7,
+		"_L_function" : "Lmax",
+		"_threshold" : 0.7,
 		"max_batch" : {
-			"global" : 10
+			"global" : 10,
+			"local" : 8,
+			"fusion": 8
 		}
 	},
 	"exp6" : {
@@ -280,23 +282,96 @@
 		"L_function" : "L1",
 		"threshold" : 0.8
 	},
+	"__comment__": "train local and fusion using densenet121 avg",
 	"exp33" : {
-		"net" : "exp01",
+		"net" : "exp5",
 		"branch" : ["local", "fusion"],
 		"L_function" : "Lmax",
-		"threshold" : 0.9
+		"threshold" : 0.4
 	},
 	"exp34" : {
-		"net" : "exp01",
+		"net" : "exp5",
 		"branch" : ["local", "fusion"],
 		"L_function" : "L2",
-		"threshold" : 0.9
+		"threshold" : 0.4
 	},
 	"exp35" : {
-		"net" : "exp01",
+		"net" : "exp5",
 		"branch" : ["local", "fusion"],
 		"L_function" : "L1",
-		"threshold" : 0.9
+		"threshold" : 0.4
+	},
+	"exp36" : {
+		"net" : "exp5",
+		"branch" : ["local", "fusion"],
+		"L_function" : "Lmax",
+		"threshold" : 0.5
+	},
+	"exp37" : {
+		"net" : "exp5",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L2",
+		"threshold" : 0.5
+	},
+	"exp38" : {
+		"net" : "exp5",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L1",
+		"threshold" : 0.5
+	},
+	"exp39" : {
+		"net" : "exp5",
+		"branch" : ["local", "fusion"],
+		"L_function" : "Lmax",
+		"threshold" : 0.6
+	},
+	"exp40" : {
+		"net" : "exp5",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L2",
+		"threshold" : 0.6
+	},
+	"exp41" : {
+		"net" : "exp5",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L1",
+		"threshold" : 0.6
+	},
+	"exp42" : {
+		"net" : "exp5",
+		"branch" : ["local", "fusion"],
+		"L_function" : "Lmax",
+		"threshold" : 0.7
+	},
+	"exp43" : {
+		"net" : "exp5",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L2",
+		"threshold" : 0.7
+	},
+	"exp44" : {
+		"net" : "exp5",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L1",
+		"threshold" : 0.7
+	},
+	"exp45" : {
+		"net" : "exp5",
+		"branch" : ["local", "fusion"],
+		"L_function" : "Lmax",
+		"threshold" : 0.8
+	},
+	"exp46" : {
+		"net" : "exp5",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L2",
+		"threshold" : 0.8
+	},
+	"exp47" : {
+		"net" : "exp5",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L1",
+		"threshold" : 0.8
 	},
 	"exp24" : {
 		"net" : {

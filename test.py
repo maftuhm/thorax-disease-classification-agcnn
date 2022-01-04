@@ -94,12 +94,22 @@ def main():
 	test_loader = DataLoader(dataset = test_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = False, num_workers = num_workers, pin_memory = True)
 
 	# ================= MODELS ================= #
+	print("\n Model initialization")
+	print(" ============================================")
+	print(" Global branch")
 	GlobalModel = MainNet(pretrained = False, num_classes = NUM_CLASSES, **config['net']).to(device)
-	
 	if args.all_branch:
+		print(" Local branch")
 		LocalModel = MainNet(pretrained = False, num_classes = NUM_CLASSES, **config['net']).to(device)
 		AttentionGenPatchs = AttentionMaskInference(threshold = config['threshold'], distance_function = config['L_function'])
 		FusionModel = FusionNet(backbone = config['net']['backbone'], num_classes = NUM_CLASSES).to(device)
+		print(" L distance function \t:", config['L_function'])
+		print(" Threshold \t\t:", AttentionGenPatchs.threshold)
+	print(" Num classes \t\t:", NUM_CLASSES)
+	print(" Optimizer \t\t:", list(config['optimizer'].keys())[0])
+	# print(" Lr Scheduler \t\t:", list(config['lr_scheduler'].keys())[0])
+	print(" Loss function \t\t:", config['loss'])
+	print()
 
 	if args.best_model:
 		add_text = '_best'
