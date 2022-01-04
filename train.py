@@ -26,6 +26,7 @@ def parse_args():
 	parser = argparse.ArgumentParser(description='AG-CNN')
 	parser.add_argument('--use', type=str, default='train', help='use for what (train or test)')
 	parser.add_argument("--exp_dir", type=str, default='./experiments2', help='define experiment directory (ex: /exp16)')
+	parser.add_argument("--datadir", type=str, default='../lung-disease-detection/data', help='define data directory (ex: /data)')
 	parser.add_argument("--exp_num", type=str, default='exp0', help='define experiment directory (ex: /exp0)')
 	parser.add_argument("--resume", "-r", action="store_true")
 	args = parser.parse_args()
@@ -334,7 +335,7 @@ def main():
 		print(" Local branch")
 		LocalModel = MainNet(num_classes = NUM_CLASSES, **config.net)
 		FusionModel = FusionNet(threshold = config.threshold, distance_function = config.L_function, num_classes = NUM_CLASSES, **config.net)
-	AttentionGenPatchs = AttentionMaskInference(threshold = config.threshold, distance_function = config.L_function)
+	AttentionGenPatchs = AttentionMaskInference(threshold = 0, distance_function = config.L_function)
 	print(" L distance function \t:", config.L_function)
 	print(" Threshold \t\t:", AttentionGenPatchs.threshold)
 	print(" Num classes \t\t:", NUM_CLASSES)
@@ -347,13 +348,13 @@ def main():
 		start_time_train = datetime.now()
 
 		# ================= LOAD DATASET ================= #
-		train_dataset = ChestXrayDataSet(DATA_DIR, 'train', num_classes = NUM_CLASSES, transform = transform_train, init_transform=transform_init)
+		train_dataset = ChestXrayDataSet(args.datadir, 'train', num_classes = NUM_CLASSES, transform = transform_train, init_transform=transform_init)
 		train_loader = DataLoader(dataset = train_dataset, batch_size = MAX_BATCH_CAPACITY[branch_name], shuffle = True, num_workers = 5, pin_memory = True, drop_last=True)
 
-		val_dataset = ChestXrayDataSet(DATA_DIR, 'val', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
+		val_dataset = ChestXrayDataSet(args.datadir, 'val', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
 		val_loader = DataLoader(dataset = val_dataset, batch_size = 60, shuffle = False, num_workers = 5, pin_memory = False)
 
-		test_dataset = ChestXrayDataSet(DATA_DIR, 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
+		test_dataset = ChestXrayDataSet(args.datadir, 'test', num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
 		test_loader = DataLoader(dataset = test_dataset, batch_size = 60, shuffle = False, num_workers = 5, pin_memory = False)
 
 		if config.loss == C.l.BCELoss:
@@ -388,6 +389,7 @@ def main():
 			GlobalModel.load_state_dict(save_dict_global['net'])
 			GlobalModel.eval()
 			GlobalModel.requires_grad_(False)
+			AttentionGenPatchs.load_weight(GlobalModel.fc.weight.detach())
 
 			Model = LocalModel.to(device)
 			TestModel = attrdict({

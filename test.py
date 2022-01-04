@@ -26,6 +26,7 @@ def parse_args():
 	parser.add_argument("--exp_dir", type=str, default='./final_experiments', help='define experiment directory (ex: /exp16)')
 	parser.add_argument("--exp_num", type=str, default='exp0', help='define experiment directory (ex: /exp0)')
 	parser.add_argument("--dataset", type=str, default='test', help='define dataset name (ex: train, val or test)')
+	parser.add_argument("--datadir", type=str, default='../lung-disease-detection/data', help='define data directory (ex: /data)')
 	parser.add_argument("--best_model", "-b", action="store_true")
 	parser.add_argument("--loss", "-l", action="store_true")
 	parser.add_argument("--all_branch",  "-all", action="store_true")
@@ -65,10 +66,10 @@ if 'num_classes' in list(config.keys()):
 NUM_CLASSES = len(CLASS_NAMES)
 
 MAX_BATCH_CAPACITY = 60
-if MAX_BATCH_CAPACITY % 5 == 0:
-	num_workers = 5
-else:
-	num_workers = 4
+# if MAX_BATCH_CAPACITY % 5 == 0:
+# 	num_workers = 5
+# else:
+num_workers = 4
 
 cudnn.benchmark = True
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -90,7 +91,7 @@ def main():
 
 	# ================= LOAD DATASET ================= #
 
-	test_dataset = ChestXrayDataSet(DATA_DIR, args.dataset, num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
+	test_dataset = ChestXrayDataSet(args.datadir, args.dataset, num_classes = NUM_CLASSES, transform = transform_test, init_transform=transform_init)
 	test_loader = DataLoader(dataset = test_dataset, batch_size = MAX_BATCH_CAPACITY, shuffle = False, num_workers = num_workers, pin_memory = True)
 
 	# ================= MODELS ================= #

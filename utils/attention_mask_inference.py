@@ -53,6 +53,116 @@ def binImage(heatmap, threshold = 0.7, thresh_otsu = False):
     return heatmap_bin
 
 class AttentionMaskInference:
+    def __init__(self, weights = None, threshold = 0, distance_function = None, size = 224):
+
+        self.weights = weights
+
+        L1 = lambda features: features.sum(1)
+        L2 = lambda features: np.sqrt((features ** 2).sum(1))
+        Lmax = lambda features: features.max(1)
+
+        if distance_function == "Lmax":
+            self.distance = lambda images: self._normalize(Lmax(images))
+        elif distance_function == "L1":
+            self.distance = lambda images: self._normalize(L1(images))
+        elif distance_function == "L2":
+            self.distance = lambda images: self._normalize(L2(images))
+        else:
+            raise Exception("distance function must be L1, L2 or Lmax")
+
+        self.resize = lambda images: np.asarray([cv2.resize(img, (224, 224)) for img in images])
+        self.threshold = lambda images: np.asarray([selectMaxConnect(self._threshold(img, threshold)) for img in images])
+        self.touint8 = lambda img: img if img.dtype == np.uint8 else np.uint8(img * 255)
+        self.get_coords = lambda images: [self.get_coord_nonzero(img) for img in images]
+        self.crop_resize = lambda images, bboxes: np.asarray([self._resize(self._crop(img, bbox), size) for img, bbox in zip(images, bboxes)])
+
+    def __call__(self, x, features):
+        features = features if self.weights is None else self._add_weight(features, self.weights) # N x D x H x W
+        heatmaps = self.distance(features)   # N x H x W
+        out_heatmaps = self.resize(heatmaps)  # N x 224 x 224
+        heatmaps = self.touint8(out_heatmaps)
+        heatmaps_bin = self.threshold(heatmaps) 
+
+        coords = self.get_coords(heatmaps_bin)
+        out = self.crop_resize(x.numpy().squeeze(), coords)
+        out = torch.from_numpy(out).unsqueeze(1)
+        result = {
+            'image' : out,
+            'heatmap' : out_heatmaps,
+            'coordinate' : coords
+        }
+        return result
+
+    @staticmethod
+    def _resize(image, size, inter = cv2.INTER_LINEAR, background = -2.1760):
+
+        dim = None
+        (h, w) = image.shape[:2]
+        if h > w:
+            r = size / float(h)
+            dim = (round(w * r), size)
+        else:
+            r = size / float(w)
+            dim = (size, round(h * r))
+
+        resized = cv2.resize(image, dim, interpolation = inter)
+
+        (h, w) = resized.shape[:2]
+        dim = (size, size) if resized.ndim == 2 else (size, size, resized.shape[-1])
+        new_img = np.ones(dim) * background
+        new_img = new_img.astype(resized.dtype)
+
+        if size > h:
+            dif = round((size - h) / 2)
+            new_img[dif:h+dif,:] = resized
+        else:
+            dif = round((size - w) / 2)
+            new_img[:,dif:w+dif] = resized
+
+        return new_img
+
+    @staticmethod
+    def _add_weight(features, weight):
+        weight = weight if type(weight) == np.ndarray else np.asarray(weight)
+        features = features if type(features) == np.ndarray else np.asarray(features)
+        features = np.transpose(features, (0, 2, 3, 1))
+        weight = np.transpose(weight, (1, 0))
+
+        assert weight.shape[0] == features.shape[-1], "shape features and weight are not match"
+
+        return np.transpose(np.matmul(features, weight), (0, 3, 1, 2))
+
+    @staticmethod
+    def _normalize(images):
+        min_ = images.min(axis = (-2, -1), keepdims=True)
+        max_ = images.max(axis = (-2, -1), keepdims=True)
+        return (images - min_) / (max_ - min_)
+    
+    @staticmethod
+    def _threshold(heatmap, threshold = 0):
+        assert heatmap.dtype == np.uint8, "heatmap dtype must be np.uint8"
+        if threshold == 0:
+            return cv2.threshold(heatmap , 0 , 255 , cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
+        elif threshold > 0:
+            return cv2.threshold(heatmap , round(threshold[0] * 255), 255, cv2.THRESH_BINARY)[1]
+        elif isinstance(threshold, tuple):
+            return cv2.threshold(heatmap , round(threshold[0] * 255), round(threshold[1] * 255), cv2.THRESH_BINARY)[1]
+        else:
+            raise Exception("Threshold is invalid, threshold=" + str(threshold))
+
+    @staticmethod
+    def get_coord_nonzero(heatmap, threshold = 0.):
+        ind = np.transpose((heatmap > threshold).nonzero())
+        return ind[:,1].min(), ind[:,0].min(), ind[:,1].max(), ind[:,0].max()
+
+    @staticmethod
+    def _crop(image, bbox):
+        return image[bbox[1]:bbox[3], bbox[0]:bbox[2]]
+
+    def load_weight(self, weight):
+        self.weights = weight
+
+class _AttentionMaskInferenceOld_:
     def __init__(self, threshold = 0.7, distance_function = "Lmax", size = (224, 224), mode = 'bilinear'):
 
         if distance_function == "Lmax":
@@ -95,10 +205,10 @@ class AttentionMaskInference:
         for i in range(images.size(0)):
             heatmap = heatmaps[i] * torch.from_numpy(selectMaxConnect(heatmaps[i]))
             coord = torch.nonzero(heatmap, as_tuple = False)
-            xmin = torch.min(coord[:,0])
-            xmax = torch.max(coord[:,0])
-            ymin = torch.min(coord[:,1])
-            ymax = torch.max(coord[:,1])
+            xmin = torch.min(coord[:,0]).item()
+            xmax = torch.max(coord[:,0]).item()
+            ymin = torch.min(coord[:,1]).item()
+            ymax = torch.max(coord[:,1]).item()
             img = images[i][:, xmin:xmax, ymin:ymax]
             out[i] = self.resize(img.unsqueeze(0)).squeeze(0)
 

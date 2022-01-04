@@ -12,6 +12,7 @@ cudnn.benchmark = True
 
 def parse_args():
     parser = argparse.ArgumentParser(description='AG-CNN')
+    parser.add_argument("--datadir", type=str, default='../lung-disease-detection/data', help='define data directory (ex: /data)')
     parser.add_argument("--batch_size", type=int, default=20)
     parser.add_argument("--pin_memory", "-pm", action="store_true")
     parser.add_argument("--non_blocking", "-nb", action="store_true")
@@ -62,7 +63,7 @@ def main():
     best_time_loader = 1000.
     best_num_worker = -1
 
-    train_data = ChestXrayDataSet(DATA_DIR, args.data_split, num_classes = 15, transform = transform_train, init_transform=transform_init)
+    train_data = ChestXrayDataSet(args.datadir, args.data_split, num_classes = 15, transform = transform_train, init_transform=transform_init)
     # val_data = ChestXrayDataSet(data_dir = DATA_DIR, split = 'val', num_classes = 14, transform = transform_test, init_transform=transform_init)
 
     print(" Start loader with pin_memory={} and non_blocking={}".format(args.pin_memory, args.non_blocking))
