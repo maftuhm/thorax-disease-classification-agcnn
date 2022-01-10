@@ -178,7 +178,7 @@ def draw_bounding_box(image, bbox, label = None, color=(0, 255, 0)):
 	return transforms_th.ToTensor()(img_to_draw).unsqueeze(0)
 
 def draw_heatmap(image, heatmap):
-	heatmap = np.uint8(255 * heatmap.numpy())
+	heatmap = np.uint8(255 * heatmap)
 	heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
 
 	img = cv2.cvtColor(np.uint8(255 * image.permute(1, 2, 0).numpy()), cv2.COLOR_RGB2BGR)

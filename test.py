@@ -142,6 +142,7 @@ def main():
 			save_dict = torch.load(checkpoint_local)
 			LocalModel.load_state_dict(save_dict['net'])
 			print(" Loaded Local Branch Model checkpoint from epoch", save_dict['epoch'])
+			AttentionGenPatchs.load_weight(GlobalModel.fc.weight.detach().cpu())
 			del save_dict
 			torch.cuda.empty_cache()
 		else:

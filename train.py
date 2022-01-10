@@ -165,7 +165,7 @@ def train_one_epoch(epoch, branch, model, optimizer, lr_scheduler, data_loader, 
 									images_draw['targets'],
 									output['score'].detach().cpu(),
 									output_patches['image'].detach().cpu(),
-									output_patches['heatmap'].detach().cpu(),
+									output_patches['heatmap'],
 									None,
 									output_patches['coordinate'])
 
@@ -254,7 +254,7 @@ def val_one_epoch(epoch, branch, model, data_loader, criterion, test_model = Non
 									images_draw.targets,
 									output.score.detach(),
 									output_patches['image'].detach().cpu(),
-									output_patches['heatmap'].detach().cpu(),
+									output_patches['heatmap'],
 									None,
 									output_patches['coordinate'])
 
@@ -335,7 +335,7 @@ def main():
 		print(" Local branch")
 		LocalModel = MainNet(num_classes = NUM_CLASSES, **config.net)
 		FusionModel = FusionNet(threshold = config.threshold, distance_function = config.L_function, num_classes = NUM_CLASSES, **config.net)
-	AttentionGenPatchs = AttentionMaskInference(threshold = 0, distance_function = config.L_function)
+	AttentionGenPatchs = AttentionMaskInference(threshold = config.threshold, distance_function = config.L_function, keepratio=False)
 	print(" L distance function \t:", config.L_function)
 	print(" Threshold \t\t:", AttentionGenPatchs.threshold)
 	print(" Num classes \t\t:", NUM_CLASSES)
@@ -389,7 +389,7 @@ def main():
 			GlobalModel.load_state_dict(save_dict_global['net'])
 			GlobalModel.eval()
 			GlobalModel.requires_grad_(False)
-			AttentionGenPatchs.load_weight(GlobalModel.fc.weight.detach())
+			# AttentionGenPatchs.load_weight(GlobalModel.fc.weight.detach().cpu())
 
 			Model = LocalModel.to(device)
 			TestModel = attrdict({
@@ -406,6 +406,7 @@ def main():
 			GlobalModel.load_state_dict(save_dict_global['net'])			
 			GlobalModel.eval()
 			GlobalModel.requires_grad_(False)
+			# AttentionGenPatchs.load_weight(GlobalModel.fc.weight.detach().cpu())
 
 			save_dict_local = torch.load(os.path.join(exp_dir_num, args.exp_num + '_local_best_auroc' + '.pth'), map_location='cpu')
 			print(" Loaded local branch model checkpoint from epoch " + str(save_dict_local['epoch']) + " for fusion local branch")

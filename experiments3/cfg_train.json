@@ -391,6 +391,26 @@
 		"L_function" : "L1",
 		"threshold" : 0
 	},
+	"__comment__": "train local and fusion using without keep ratio image and multiplication with global weight",
+	"exp51" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "Lmax",
+		"threshold" : 0
+	},
+	"exp52" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L2",
+		"threshold" : 0
+	},
+	"exp53" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "L1",
+		"threshold" : 0
+	},
+	"__comment__": "train local and fusion using without keep ratio image and multiplication with global weight",
 	"exp24" : {
 		"net" : {
 			"backbone" : "resnet50",
