@@ -102,7 +102,7 @@ def main():
 	if args.all_branch:
 		print(" Local branch")
 		LocalModel = MainNet(pretrained = False, num_classes = NUM_CLASSES, **config['net']).to(device)
-		AttentionGenPatchs = AttentionMaskInference(threshold = config['threshold'], distance_function = config['L_function'])
+		AttentionGenPatchs = AttentionMaskInference(threshold = config['threshold'], distance_function = config['L_function'], keepratio=False)
 		FusionModel = FusionNet(backbone = config['net']['backbone'], num_classes = NUM_CLASSES).to(device)
 		print(" L distance function \t:", config['L_function'])
 		print(" Threshold \t\t:", AttentionGenPatchs.threshold)

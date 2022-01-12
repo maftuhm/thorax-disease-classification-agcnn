@@ -398,6 +398,12 @@
 		"L_function" : "Lmax",
 		"threshold" : 0
 	},
+	"exp510" : {
+		"net" : "exp01",
+		"branch" : ["local", "fusion"],
+		"L_function" : "Lmax",
+		"threshold" : 0
+	},
 	"exp52" : {
 		"net" : "exp01",
 		"branch" : ["local", "fusion"],
